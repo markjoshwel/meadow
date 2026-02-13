@@ -34,6 +34,9 @@ def discover_python_files(
 
     yields: `Path`
         paths to python files
+
+    returns: `none`
+        no return value
     """
     if not sources:
         # default to current directory

@@ -19,12 +19,12 @@ class TestConfig:
         assert isinstance(config.exclude, list)
         assert config.respect_gitignore is True
         assert config.multi_line_summary_on_line in (1, 2)
+        assert config.module_docstrings is False
 
     def test_format_config_defaults(self) -> None:
         """Test format config defaults"""
         fmt = FormatConfig()
 
-        assert fmt.module_docstrings is False
         assert fmt.line_length == 79
         assert fmt.indent_width == 4
         assert fmt.indent_style == "space"

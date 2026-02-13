@@ -59,6 +59,7 @@ SECTION_HEADERS: dict[str, SectionType] = {
     "returns:": SectionType.RETURNS,
     "raises:": SectionType.RAISES,
     "usage:": SectionType.USAGE,
+    "examples:": SectionType.USAGE,
 }
 
 # section order for validation (lower = earlier in docstring)
@@ -261,6 +262,9 @@ class MDFParser:
         arguments:
             `file_path: str | None = None`
                 path to source file for location tracking
+
+        returns: `none`
+            no return value
         """
         self.file_path = file_path
         self.diagnostics = DiagnosticCollection()
@@ -432,6 +436,9 @@ class MDFParser:
         arguments:
             `section: Section`
                 section to parse
+
+        returns: `none`
+            no return value
         """
         if section.section_type in (
             SectionType.ATTRIBUTES,
@@ -768,6 +775,9 @@ class MDFParser:
                 parsed docstring to validate
             `line_offset: int`
                 starting line number
+
+        returns: `none`
+            no return value
         """
         last_order = -1
         for section in parsed.sections:

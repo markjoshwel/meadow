@@ -46,6 +46,9 @@ class MarkdownGenerator:
         arguments:
             `config: GenerateConfig | None = None`
                 generate configuration
+
+        returns: `none`
+            no return value
         """
         self.config = config or GenerateConfig()
 
@@ -122,7 +125,7 @@ class MarkdownGenerator:
             module_name = self._get_module_name(file_path)
             file_md = self.generate_for_file(file_path, base_path)
             if file_md and file_md.strip():
-                file_outputs.append((module_name, file_md))
+                file_outputs.append((module_name, str(file_md)))
                 # add TOC entry
                 anchor = (
                     module_name.lower().replace(".", "-").replace(" ", "-")
@@ -141,7 +144,7 @@ class MarkdownGenerator:
             lines.extend(toc_entries)
 
         # add file contents
-        for module_name, file_md in file_outputs:
+        for _module_name, file_md in file_outputs:
             lines.append("")
             lines.append(file_md)
 
@@ -197,7 +200,6 @@ class MarkdownGenerator:
             return ""
 
         lines: list[str] = []
-        base_level = self.config.starting_header_level
 
         # skip modules
         if element.element_type == "module":
@@ -325,7 +327,7 @@ class MarkdownGenerator:
         """
         args_str = ""
         if element.arguments:
-            arg_parts = []
+            arg_parts: list[str] = []
             for arg_name, type_ann, default in element.arguments:
                 if type_ann and default:
                     arg_parts.append(f"{arg_name}: {type_ann} = {default}")

@@ -30,7 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
         description="a docstring machine based on typing information for the meadow Docstring Format",
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
@@ -46,12 +46,12 @@ def create_parser() -> argparse.ArgumentParser:
         help="generate or update docstrings in files",
     )
     _add_common_args(format_parser)
-    format_parser.add_argument(
+    _ = format_parser.add_argument(
         "--fix-malformed",
         action="store_true",
         help="fix any fixable malformed MDF docstrings automatically",
     )
-    format_parser.add_argument(
+    _ = format_parser.add_argument(
         "--custom-todoc-message",
         type=str,
         default="# TODOC: meadoc",
@@ -71,13 +71,13 @@ def create_parser() -> argparse.ArgumentParser:
         help="generate markdown api references",
     )
     _add_common_args(generate_parser)
-    generate_parser.add_argument(
+    _ = generate_parser.add_argument(
         "-O",
         "--output",
         type=str,
         help="output file path (default: stdout)",
     )
-    generate_parser.add_argument(
+    _ = generate_parser.add_argument(
         "-H",
         "--starting-header",
         type=int,
@@ -86,7 +86,7 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="starting header level for api reference title (default: 2)",
     )
-    generate_parser.add_argument(
+    _ = generate_parser.add_argument(
         "--no-toc",
         action="store_true",
         help="disable table of contents generation",
@@ -97,7 +97,7 @@ def create_parser() -> argparse.ArgumentParser:
         "config",
         help="display docs about configuration",
     )
-    config_parser.add_argument(
+    _ = config_parser.add_argument(
         "config_type",
         nargs="?",
         choices=["pyproject.toml", "meadoc.toml"],
@@ -116,49 +116,49 @@ def create_parser() -> argparse.ArgumentParser:
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """Add common arguments to a subparser."""
-    parser.add_argument(
+    _ = parser.add_argument(
         "source",
         nargs="*",
         type=Path,
         help="source files or directories to process",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--include",
         type=str,
         action="append",
         help="glob pattern to include files",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--exclude",
         type=str,
         action="append",
         help="glob pattern to exclude files",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-n",
         "--ignore-no-docstring",
         action="store_true",
         help="ignore files without docstrings",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-o",
         "--ignore-outdated",
         action="store_true",
         help="ignore files with outdated docstrings",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-m",
         "--ignore-malformed",
         action="store_true",
         help="ignore files with malformed docstrings",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-d",
         "--disrespect-gitignore",
         action="store_true",
         help="disable respecting .gitignore files",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-p",
         "--plumbing",
         action="store_true",
@@ -168,13 +168,13 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
 
 def _add_config_args(parser: argparse.ArgumentParser) -> None:
     """Add config-specific arguments."""
-    parser.add_argument(
+    _ = parser.add_argument(
         "--include",
         type=str,
         action="append",
         help="set include pattern in example config",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--exclude",
         type=str,
         action="append",

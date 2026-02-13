@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -56,6 +56,7 @@ class MeadowError(Exception):
         self.location = location
         super().__init__(message)
 
+    @override
     def __str__(self) -> str:
         if self.location:
             return f"{self.location}: {self.message}"
@@ -290,6 +291,7 @@ class Location:
     column: int
     file: str | None = None
 
+    @override
     def __str__(self) -> str:
         """format location as "file:line:column" or "line X, column Y"."""
         if self.file:
@@ -337,6 +339,7 @@ class Diagnostic:
     def __post_init__(self) -> None:
         object.__setattr__(self, "severity", self.code.severity)
 
+    @override
     def __str__(self) -> str:
         """format diagnostic as "CODE: message (location)"."""
         return f"{self.code.value}: {self.message} (line {self.line}, col {self.column})"
@@ -373,6 +376,9 @@ class DiagnosticCollection:
         arguments:
             `diagnostic: Diagnostic`
                 the diagnostic to add
+
+        returns: `none`
+            no return value
         """
         self.diagnostics.append(diagnostic)
 
@@ -394,6 +400,9 @@ class DiagnosticCollection:
                 line number
             `column: int = 0`
                 column number (defaults to 0)
+
+        returns: `none`
+            no return value
         """
         self.add(Diagnostic(code, message, line, column))
 

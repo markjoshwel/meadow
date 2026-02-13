@@ -61,6 +61,9 @@ class DocstringBuilder:
         arguments:
             `config: FormatConfig | None = None`
                 format configuration
+
+        returns: `none`
+            no return value
         """
         self.config = config or FormatConfig()
 
@@ -103,10 +106,9 @@ class DocstringBuilder:
             result_lines.append("")
             result_lines.extend(self._generate_arguments_section(element))
 
-        # returns section
-        if element.return_annotation and element.return_annotation != "None":
-            result_lines.append("")
-            result_lines.extend(self._generate_returns_section(element))
+        # returns section (always generate, even for None)
+        result_lines.append("")
+        result_lines.extend(self._generate_returns_section(element))
 
         return self._format_docstring(result_lines)
 
@@ -191,6 +193,7 @@ class DocstringBuilder:
             "returns:",
             "raises:",
             "usage:",
+            "examples:",
         ]
         return line.lower().rstrip() in headers
 
@@ -240,13 +243,14 @@ class DocstringBuilder:
         returns: `list[str]`
             section lines
         """
-        if not element.return_annotation:
-            return []
-
         ret_lines: list[str] = []
         indent = " " * self.config.indent_width
 
-        ret_lines.append(f"returns: `{element.return_annotation}`")
+        # Always generate returns section, even for None
+        if element.return_annotation:
+            ret_lines.append(f"returns: `{element.return_annotation}`")
+        else:
+            ret_lines.append("returns: `none`")
         ret_lines.append(f"{indent}description of return value")
 
         return ret_lines
@@ -295,6 +299,9 @@ class DocstringUpdater:
         arguments:
             `config: Config`
                 configuration
+
+        returns: `none`
+            no return value
         """
         self.config = config
         self.builder = DocstringBuilder(config.format)
@@ -359,6 +366,6 @@ class DocstringUpdater:
 
         # skip module docstrings if disabled
         if element.element_type == "module":
-            return self.config.format.module_docstrings
+            return self.config.module_docstrings
 
         return True

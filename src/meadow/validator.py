@@ -327,6 +327,9 @@ class MDFValidator:
         arguments:
             `config: Config | None = None`
                 configuration for validation rules
+
+        returns: `none`
+            no return value
         """
         self.config = config
         self.diagnostics = DiagnosticCollection()
@@ -366,6 +369,9 @@ class MDFValidator:
         arguments:
             `element: CodeElement`
                 element to validate
+
+        returns: `none`
+            no return value
         """
         if element.docstring is None:
             if self._should_have_docstring(element):
@@ -428,6 +434,9 @@ class MDFValidator:
                 parsed docstring
             `element: CodeElement`
                 code element to compare against
+
+        returns: `none`
+            no return value
         """
         if element.arguments:
             self._validate_arguments(parsed, element)
@@ -448,6 +457,9 @@ class MDFValidator:
                 parsed docstring
             `element: CodeElement`
                 code element with arguments
+
+        returns: `none`
+            no return value
         """
         args_section = None
         for section_type in (SectionType.ARGUMENTS, SectionType.PARAMETERS):
@@ -516,6 +528,9 @@ class MDFValidator:
                 parsed docstring
             `element: CodeElement`
                 code element with return type
+
+        returns: `none`
+            no return value
         """
         returns_section = parsed.get_section(SectionType.RETURNS)
 
@@ -539,6 +554,9 @@ class MDFValidator:
                 parsed docstring
             `element: CodeElement`
                 class element with attributes
+
+        returns: `none`
+            no return value
         """
         attrs_section = parsed.get_section(SectionType.ATTRIBUTES)
 

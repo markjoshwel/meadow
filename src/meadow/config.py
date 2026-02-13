@@ -11,14 +11,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import tomlkit
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
 from meadow.errors import ConfigError, Location
-
 
 # constants
 DEFAULT_INCLUDE_PATTERNS: list[str] = [
@@ -68,7 +67,7 @@ INDENT_STYLE_OPTIONS: tuple[str, ...] = ("space", "tab")
 
 def _get_bool(table: Table, key: str) -> bool | None:
     """Safely get a boolean value from a TOML table."""
-    value = table.get(key)
+    value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, bool):
         return value
     return None
@@ -76,7 +75,7 @@ def _get_bool(table: Table, key: str) -> bool | None:
 
 def _get_int(table: Table, key: str) -> int | None:
     """Safely get an integer value from a TOML table."""
-    value = table.get(key)
+    value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, int):
         return value
     return None
@@ -84,7 +83,7 @@ def _get_int(table: Table, key: str) -> int | None:
 
 def _get_str(table: Table, key: str) -> str | None:
     """Safely get a string value from a TOML table."""
-    value = table.get(key)
+    value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, str):
         return value
     return None
@@ -92,15 +91,15 @@ def _get_str(table: Table, key: str) -> str | None:
 
 def _get_list(table: Table, key: str) -> list[object] | None:
     """Safely get a list value from a TOML table."""
-    value = table.get(key)
+    value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, list):
-        return value  # type: ignore[return-value]
+        return cast(list[object], value)
     return None
 
 
-def _get_table(table: Table, key: str) -> Table | None:
-    """Safely get a table value from a TOML table."""
-    value = table.get(key)
+def _get_table(table: Table | TOMLDocument, key: str) -> Table | None:
+    """Safely get a table value from a TOML table or document."""
+    value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, Table):
         return value
     return None
@@ -113,8 +112,6 @@ class FormatConfig:
     Controls how docstrings are formatted and generated.
 
     attributes:
-        `module_docstrings: bool = False`
-            whether to generate docstrings for modules
         `line_length: int = 79`
             maximum line length for docstrings
         `line_ending: str = ""`
@@ -131,7 +128,6 @@ class FormatConfig:
             which line to place multi-line summary on
     """
 
-    module_docstrings: bool = False
     line_length: int = 79
     line_ending: str = ""  # empty = autodetect
     indent_width: int = 4
@@ -193,6 +189,8 @@ class Config:
             whether to respect .gitignore files
         `multi_line_summary_on_line: Literal[1, 2] = 2`
             which line to place multi-line summary on
+        `module_docstrings: bool = False`
+            whether to process module-level docstrings
         `format: FormatConfig`
             format subcommand configuration
         `generate: GenerateConfig`
@@ -215,6 +213,7 @@ class Config:
     exclude: list[str] = field(default_factory=list)
     respect_gitignore: bool = True
     multi_line_summary_on_line: Literal[1, 2] = 2
+    module_docstrings: bool = False
     format: FormatConfig = field(default_factory=FormatConfig)
     generate: GenerateConfig = field(default_factory=GenerateConfig)
 
@@ -285,6 +284,8 @@ class Config:
             `path: Path`
                 path to the configuration file
 
+        returns: `none`
+
         raises:
             `ConfigError`
                 if the file cannot be read or contains invalid values
@@ -302,11 +303,11 @@ class Config:
         config_table: Table | None = None
 
         if path.name == "pyproject.toml":
-            tool_table = _get_table(doc, "tool")  # type: ignore[arg-type]
+            tool_table = _get_table(doc, "tool")
             if tool_table:
                 config_table = _get_table(tool_table, "meadoc")
         else:
-            config_table = _get_table(doc, "meadoc")  # type: ignore[arg-type]
+            config_table = _get_table(doc, "meadoc")
 
         if config_table is None:
             return
@@ -326,7 +327,13 @@ class Config:
 
         summary_value = _get_int(config_table, "multi-line-summary-on-line")
         if summary_value is not None and summary_value in SUMMARY_LINE_OPTIONS:
-            self.multi_line_summary_on_line = summary_value  # type: ignore[assignment]
+            self.multi_line_summary_on_line = cast(
+                Literal[1, 2], summary_value
+            )
+
+        module_docstrings = _get_bool(config_table, "module-docstrings")
+        if module_docstrings is not None:
+            self.module_docstrings = module_docstrings
 
         # load format section
         format_table = _get_table(config_table, "format")
@@ -344,11 +351,10 @@ class Config:
         arguments:
             `table: Table`
                 the [meadoc.format] or [tool.meadoc.format] table
-        """
-        module_docstrings = _get_bool(table, "module-docstrings")
-        if module_docstrings is not None:
-            self.format.module_docstrings = module_docstrings
 
+        returns: `none`
+            no return value
+        """
         line_length = _get_int(table, "line-length")
         if line_length is not None and line_length > 0:
             self.format.line_length = line_length
@@ -363,7 +369,9 @@ class Config:
 
         indent_style = _get_str(table, "indent-style")
         if indent_style is not None and indent_style in INDENT_STYLE_OPTIONS:
-            self.format.indent_style = indent_style  # type: ignore[assignment]
+            self.format.indent_style = cast(
+                Literal["space", "tab"], indent_style
+            )
 
         code_block_format = _get_bool(table, "code-block-format")
         if code_block_format is not None:
@@ -377,7 +385,9 @@ class Config:
 
         summary_line = _get_int(table, "multi-line-summary-on-line")
         if summary_line is not None and summary_line in SUMMARY_LINE_OPTIONS:
-            self.format.multi_line_summary_on_line = summary_line  # type: ignore[assignment]
+            self.format.multi_line_summary_on_line = cast(
+                Literal[1, 2], summary_line
+            )
 
     def _load_generate_config(self, table: Table) -> None:
         """Load generate configuration from a TOML table.
@@ -385,6 +395,9 @@ class Config:
         arguments:
             `table: Table`
                 the [meadoc.generate] or [tool.meadoc.generate] table
+
+        returns: `none`
+            no return value
         """
         external_link_ref = _get_str(table, "external-link-reference")
         if external_link_ref is not None:
@@ -404,13 +417,18 @@ class Config:
 
         indent_style = _get_str(table, "indent-style")
         if indent_style is not None and indent_style in INDENT_STYLE_OPTIONS:
-            self.generate.indent_style = indent_style  # type: ignore[assignment]
+            self.generate.indent_style = cast(
+                Literal["space", "tab"], indent_style
+            )
 
         external_links = _get_table(table, "external-links")
         if external_links:
-            self.generate.external_links = {
-                str(key): str(value) for key, value in external_links.items()
-            }
+            links_dict: dict[str, str] = {}
+            for key_obj, value_obj in external_links.items():  # pyright: ignore[reportUnknownVariableType]
+                key: object = key_obj  # pyright: ignore[reportUnknownVariableType]
+                value: object = value_obj  # pyright: ignore[reportUnknownVariableType]
+                links_dict[str(key)] = str(value)  # pyright: ignore
+            self.generate.external_links = links_dict
 
     def to_example_toml(self, table_name: str = "meadoc") -> str:
         """Generate example TOML configuration as a string.
@@ -448,11 +466,11 @@ class Config:
                 "",
                 f"multi-line-summary-on-line = {self.multi_line_summary_on_line}",
                 "",
-                f"[{table_name}.format]",
                 "# module docstrings usually have more varied styling/writing,",
                 "# so it is disabled by default",
-                f"module-docstrings = {str(self.format.module_docstrings).lower()}",
+                f"module-docstrings = {str(self.module_docstrings).lower()}",
                 "",
+                f"[{table_name}.format]",
                 "# docstring formatting preferences",
                 f"line-length = {self.format.line_length}",
                 f'line-ending = "{self.format.line_ending}"',
