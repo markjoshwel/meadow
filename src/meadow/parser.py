@@ -1,398 +1,804 @@
+"""meadow Docstring Format (MDF) parser.
+
+with all my heart, 2026, mark joshwel <mark@joshwel.co>
+SPDX-License-Identifier: Unlicense OR 0BSD
+
+this module provides parsing capabilities for the meadow Docstring Format,
+converting docstrings into a structured representation.
 """
-parser for extracting signatures and docstrings using stdlib ast.
 
-extracts function/class signatures from ast nodes, parses existing docstrings
-into structured sections, and detects raised exceptions and third-party
-references.
-"""
+from __future__ import annotations
 
-import ast
-from collections import defaultdict
-from pathlib import Path
+import re
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import TypeVar
 
-from meadow.models import (
-    ClassSignature,
-    DocstringItem,
-    DocstringSection,
-    FunctionSignature,
-    ParsedCode,
-    ParsedDocstring,
-)
+from meadow.errors import DiagnosticCollection, ErrorCode, Location
+
+T = TypeVar("T", "ParameterDoc", "FunctionDoc", "ExceptionDoc", "ReturnDoc")
 
 
-def _type_annotation_to_str(node: ast.AST | None) -> str:
+class SectionType(Enum):
+    """types of sections in an MDF docstring.
+
+    members:
+        `PREAMBLE` - initial description line
+        `BODY` - additional description text
+        `ATTRIBUTES` - class attributes
+        `ARGUMENTS` - function arguments
+        `PARAMETERS` - alternative name for arguments
+        `FUNCTIONS` - module-level functions
+        `METHODS` - class methods
+        `RETURNS` - return type annotation
+        `RAISES` - exception classes
+        `USAGE` - usage examples
+        `UNKNOWN` - unrecognised section
     """
-    convert ast type annotation to string
 
-    handles various ast annotation node types and converts them to string
-    representation
+    PREAMBLE = auto()
+    BODY = auto()
+    ATTRIBUTES = auto()
+    ARGUMENTS = auto()
+    PARAMETERS = auto()
+    FUNCTIONS = auto()
+    METHODS = auto()
+    RETURNS = auto()
+    RAISES = auto()
+    USAGE = auto()
+    UNKNOWN = auto()
 
-    arguments:
-        `node: ast.AST | None`
-            ast node to convert
 
-    returns:
-        `str`
-            string representation of the type annotation
+# section headers that trigger MDF parsing
+SECTION_HEADERS: dict[str, SectionType] = {
+    "attributes:": SectionType.ATTRIBUTES,
+    "arguments:": SectionType.ARGUMENTS,
+    "parameters:": SectionType.PARAMETERS,
+    "functions:": SectionType.FUNCTIONS,
+    "methods:": SectionType.METHODS,
+    "returns:": SectionType.RETURNS,
+    "raises:": SectionType.RAISES,
+    "usage:": SectionType.USAGE,
+}
+
+# section order for validation (lower = earlier in docstring)
+SECTION_ORDER: dict[SectionType, int] = {
+    SectionType.PREAMBLE: 0,
+    SectionType.BODY: 1,
+    SectionType.ATTRIBUTES: 2,
+    SectionType.ARGUMENTS: 2,
+    SectionType.PARAMETERS: 2,
+    SectionType.FUNCTIONS: 3,
+    SectionType.METHODS: 3,
+    SectionType.RETURNS: 4,
+    SectionType.RAISES: 5,
+    SectionType.USAGE: 6,
+    SectionType.UNKNOWN: 99,
+}
+
+
+@dataclass
+class ParameterDoc:
+    """documentation for a single parameter or attribute.
+
+    attributes:
+        `name: str`
+            parameter name
+        `type_annotation: str`
+            type annotation (may be empty)
+        `default_value: str | None`
+            default value if any
+        `description: list[str]`
+            description lines
+        `location: Location | None`
+            source location
     """
-    if node is None:
-        return ""
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Subscript):
-        return f"{_type_annotation_to_str(node.value)}[{_type_annotation_to_str(node.slice)}]"
-    if isinstance(node, ast.Constant):
-        return repr(node.value)
-    if isinstance(node, ast.BinOp):
-        if isinstance(node.op, ast.BitOr):
-            return f"{_type_annotation_to_str(node.left)} | {_type_annotation_to_str(node.right)}"
-    if isinstance(node, ast.Tuple):
-        return ", ".join(_type_annotation_to_str(elt) for elt in node.elts)
-    if isinstance(node, ast.Attribute):
-        return f"{_type_annotation_to_str(node.value)}.{node.attr}"
-    return ""
+
+    name: str
+    type_annotation: str
+    default_value: str | None
+    description: list[str] = field(default_factory=list)
+    location: Location | None = None
 
 
-def _extract_raises(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+@dataclass
+class FunctionDoc:
+    """documentation for a function or method signature.
+
+    attributes:
+        `signature: str`
+            function signature text
+        `description: list[str]`
+            description lines
+        `location: Location | None`
+            source location
     """
-    extract raised exceptions from function
 
-    walks the ast tree to find `raise` statements and extracts the
-    exception types being raised
+    signature: str
+    description: list[str] = field(default_factory=list)
+    location: Location | None = None
 
-    arguments:
-        `node: ast.FunctionDef | ast.AsyncFunctionDef`
-            function or async function node
 
-    returns:
-        `list[str]`
-            list of exception type names
+@dataclass
+class ExceptionDoc:
+    """documentation for an exception in raises section.
+
+    attributes:
+        `exception_class: str`
+            exception class name
+        `description: list[str]`
+            description lines
+        `location: Location | None`
+            source location
     """
-    raises = []
 
-    for child in ast.walk(node):
-        if isinstance(child, ast.Raise):
-            exc_type = None
-            if isinstance(child.exc, ast.Name):
-                exc_type = child.exc.id
-            elif isinstance(child.exc, ast.Call):
-                if isinstance(child.exc.func, ast.Name):
-                    exc_type = child.exc.func.id
-                elif isinstance(child.exc.func, ast.Attribute):
-                    exc_type = _type_annotation_to_str(child.exc.func)
-
-            if exc_type and exc_type not in raises:
-                raises.append(exc_type)
-
-    return raises
+    exception_class: str
+    description: list[str] = field(default_factory=list)
+    location: Location | None = None
 
 
-def parse_docstring(docstring: str | None) -> ParsedDocstring:
+@dataclass
+class ReturnDoc:
+    """documentation for return type.
+
+    attributes:
+        `type_annotation: str`
+            return type annotation
+        `description: list[str]`
+            description lines
+        `location: Location | None`
+            source location
     """
-    parse a meadow docstring
 
-    parses a docstring string into structured sections and items. handles the
-    meadow docstring format with sections like `arguments:`, `returns:`, etc
+    type_annotation: str
+    description: list[str] = field(default_factory=list)
+    location: Location | None = None
 
-    arguments:
-        `docstring: str | None`
-            docstring text to parse
 
-    returns:
-        `ParsedDocstring`
-            structured representation of the parsed docstring
+@dataclass
+class Section:
+    """a section within an MDF docstring.
+
+    attributes:
+        `section_type: SectionType`
+            type of section
+        `content: list[str]`
+            raw content lines
+        `items: list[ParameterDoc | FunctionDoc | ExceptionDoc | ReturnDoc]`
+            parsed items within section
+        `location: Location | None`
+            source location
     """
-    if not docstring:
-        return ParsedDocstring(
-            short_description="",
-            long_description="",
-            attributes=[],
-            arguments=[],
-            methods=[],
-            returns_type=None,
-            returns_description="",
-            raises={},
-            usage=None,
-            is_malformed=True,
-        )
 
-    lines = docstring.split("\n")
-    current_section = None
-    items_by_section = defaultdict(list)
+    section_type: SectionType
+    content: list[str] = field(default_factory=list)
+    items: list[ParameterDoc | FunctionDoc | ExceptionDoc | ReturnDoc] = field(
+        default_factory=list
+    )
+    location: Location | None = None
 
-    short_description = []
-    long_description = []
-    usage_code = []
 
-    state = "short_desc"
+@dataclass
+class ParsedDocstring:
+    """fully parsed MDF docstring.
 
-    for line in lines:
-        stripped = line.strip()
+    attributes:
+        `preamble: str`
+            first line description
+        `body: list[str]`
+            body text lines
+        `sections: list[Section]`
+            parsed sections
+        `raw_text: str`
+            original docstring text
+        `is_mdf: bool`
+            whether docstring follows MDF format
+        `diagnostics: DiagnosticCollection`
+            parsing diagnostics
+    """
 
-        if not stripped:
-            if state == "short_desc":
-                state = "long_desc"
-            continue
+    preamble: str = ""
+    body: list[str] = field(default_factory=list)
+    sections: list[Section] = field(default_factory=list)
+    raw_text: str = ""
+    is_mdf: bool = False
+    diagnostics: DiagnosticCollection = field(
+        default_factory=DiagnosticCollection
+    )
 
-        if stripped.endswith(":"):
-            section_name = stripped[:-1].lower()
-            if section_name in [
-                "attributes",
-                "arguments",
-                "methods",
-                "returns",
-                "raises",
-                "usage",
-            ]:
-                current_section = DocstringSection(section_name)
-                state = "section"
+    def get_section(self, section_type: SectionType) -> Section | None:
+        """Get a section by type.
+
+        arguments:
+            `section_type: SectionType`
+                the section type to find
+
+        returns: `Section | None`
+            the section if found, None otherwise
+        """
+        for section in self.sections:
+            if section.section_type == section_type:
+                return section
+        return None
+
+    def has_section(self, section_type: SectionType) -> bool:
+        """Check if docstring has a specific section.
+
+        arguments:
+            `section_type: SectionType`
+                the section type to check
+
+        returns: `bool`
+            True if section exists
+        """
+        return any(s.section_type == section_type for s in self.sections)
+
+
+class MDFParser:
+    """parser for meadow Docstring Format.
+
+    Parses docstrings into structured representations with diagnostic
+    information about any formatting issues.
+
+    examples:
+        ```python
+        parser = MDFParser("src/main.py")
+        result = parser.parse(docstring, line_offset=10)
+
+        if result.is_mdf:
+            print(result.preamble)
+            for section in result.sections:
+                print(section.section_type)
+        ```
+    """
+
+    file_path: str | None
+    diagnostics: DiagnosticCollection
+
+    def __init__(self, file_path: str | None = None) -> None:
+        """Initialise the parser.
+
+        arguments:
+            `file_path: str | None = None`
+                path to source file for location tracking
+        """
+        self.file_path = file_path
+        self.diagnostics = DiagnosticCollection()
+
+    def parse(self, docstring: str, line_offset: int = 1) -> ParsedDocstring:
+        """Parse a docstring into a structured representation.
+
+        arguments:
+            `docstring: str`
+                the docstring to parse
+            `line_offset: int = 1`
+                starting line number in source file
+
+        returns: `ParsedDocstring`
+            parsed docstring with diagnostics
+        """
+        result = ParsedDocstring(raw_text=docstring)
+        self.diagnostics = DiagnosticCollection()
+
+        if not docstring.strip():
+            return result
+
+        lines = docstring.split("\n")
+
+        # check for other docstring formats
+        if self._looks_like_other_format(docstring):
+            self.diagnostics.add_error(
+                ErrorCode.OTHER_FORMAT_DOCSTRING,
+                "docstring appears to be in another format (sphinx/google style)",
+                line_offset,
+            )
+            result.diagnostics = self.diagnostics
+            return result
+
+        # parse the docstring
+        current_section: Section | None = None
+        in_code_block = False
+
+        for i, line in enumerate(lines):
+            line_num = line_offset + i
+            stripped = line.strip()
+
+            # handle code blocks
+            if stripped.startswith("```"):
+                in_code_block = not in_code_block
+                if current_section:
+                    current_section.content.append(line)
+                else:
+                    result.body.append(line)
                 continue
 
-        if state == "short_desc":
-            short_description.append(stripped)
-        elif state == "long_desc":
-            long_description.append(line)
-        elif state == "section":
-            if current_section == DocstringSection.USAGE:
-                usage_code.append(line)
-            elif stripped.startswith("`") and "`" in stripped[1:]:
-                closing_backtick = stripped.find("`", 1)
-                type_part = stripped[1:closing_backtick]
-                rest = stripped[closing_backtick + 1 :].strip()
-                items_by_section[current_section].append((type_part, rest))
-            elif current_section in (
-                DocstringSection.ATTRIBUTES,
-                DocstringSection.ARGUMENTS,
-                DocstringSection.METHODS,
-            ):
-                if stripped.startswith("`"):
-                    closing_backtick = stripped.find("`", 1)
-                    if closing_backtick != -1:
-                        type_part = stripped[1:closing_backtick]
-                        rest = stripped[closing_backtick + 1 :].strip()
-                        items_by_section[current_section].append((type_part, rest))
+            if in_code_block:
+                if current_section:
+                    current_section.content.append(line)
                 else:
-                    if items_by_section[current_section]:
-                        items_by_section[current_section][-1] = (
-                            items_by_section[current_section][-1][0],
-                            items_by_section[current_section][-1][1] + " " + stripped,
-                        )
+                    result.body.append(line)
+                continue
 
-    parsed = ParsedDocstring(
-        short_description=" ".join(short_description),
-        long_description="\n".join(long_description).strip(),
-        attributes=[],
-        arguments=[],
-        methods=[],
-        returns_type=None,
-        returns_description="",
-        raises={},
-        usage="\n".join(usage_code) if usage_code else None,
-        is_malformed=False,
-    )
+            # check for section headers
+            section_type = self._detect_section_header(stripped)
 
-    for type_part, desc in items_by_section.get(DocstringSection.ATTRIBUTES, []):
-        parsed.attributes.append(
-            DocstringItem(name="", type_annotation=type_part, description=desc)
-        )
-
-    for type_part, desc in items_by_section.get(DocstringSection.ARGUMENTS, []):
-        parsed.arguments.append(DocstringItem(name="", type_annotation=type_part, description=desc))
-
-    for type_part, desc in items_by_section.get(DocstringSection.METHODS, []):
-        parsed.methods.append(DocstringItem(name="", type_annotation=type_part, description=desc))
-
-    if items_by_section.get(DocstringSection.RETURNS):
-        returns = items_by_section[DocstringSection.RETURNS][0]
-        parsed.returns_type = returns[0].replace("returns: ", "")
-        parsed.returns_description = returns[1]
-
-    for type_part, desc in items_by_section.get(DocstringSection.RAISES, []):
-        parsed.raises[type_part] = desc
-
-    return parsed
-
-
-def parse_file(path: Path) -> ParsedCode:
-    """
-    parse a python file and extract classes, functions, and imports
-
-    walks: ast tree to extract class definitions, function definitions,
-    and import statements
-
-    arguments:
-        `path: Path`
-            path to the python file to parse
-
-    returns:
-        `ParsedCode`
-            structured representation of parsed file
-    """
-    content = path.read_text(encoding="utf-8")
-    tree = ast.parse(content)
-
-    imports = []
-    classes = []
-    functions = []
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            for alias in node.names:
-                imports.append(f"{module}.{alias.name}")
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                imports.append(alias.name)
-
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            bases = []
-            for base in node.bases:
-                base_str = _type_annotation_to_str(base)
-                if base_str:
-                    bases.append(base_str)
-
-            attributes = {}
-            for item in node.body:
-                if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
-                    attributes[item.target.id] = _type_annotation_to_str(item.annotation)
-                elif isinstance(item, ast.Assign):
-                    for target in item.targets:
-                        if isinstance(target, ast.Name):
-                            attributes[target.id] = ""
-
-            methods = []
-            for item in node.body:
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    methods.append(_extract_function_signature(item))
-
-            classes.append(
-                ClassSignature(
-                    name=node.name,
-                    bases=bases,
-                    attributes=attributes,
-                    methods=methods,
+            if section_type != SectionType.UNKNOWN:
+                result.is_mdf = True
+                current_section = Section(
+                    section_type=section_type,
+                    location=Location(line_num, 0, self.file_path),
                 )
+                result.sections.append(current_section)
+                current_section.content.append(line)
+                continue
+
+            # handle content
+            if current_section is None:
+                # preamble or body
+                if i == 0 or (i == 1 and not lines[0].strip()):
+                    if stripped:
+                        result.preamble = stripped
+                else:
+                    result.body.append(line)
+            else:
+                current_section.content.append(line)
+
+        # parse section contents
+        for section in result.sections:
+            self._parse_section_content(section)
+
+        # validate preamble
+        if result.is_mdf and not result.preamble:
+            self.diagnostics.add_error(
+                ErrorCode.MISSING_PREAMBLE,
+                "MDF docstring missing preamble",
+                line_offset,
             )
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            functions.append(_extract_function_signature(node))
 
-    return ParsedCode(
-        imports=sorted(set(imports)),
-        classes=classes,
-        functions=functions,
-    )
+        # validate section order
+        self._validate_section_order(result, line_offset)
+
+        result.diagnostics = self.diagnostics
+        return result
+
+    def _detect_section_header(self, line: str) -> SectionType:
+        """Detect if a line is a section header.
+
+        arguments:
+            `line: str`
+                line to check
+
+        returns: `SectionType`
+            detected section type or UNKNOWN
+        """
+        lower = line.lower().rstrip()
+
+        # direct match
+        if lower in SECTION_HEADERS:
+            return SECTION_HEADERS[lower]
+
+        # check with colon
+        if lower + ":" in SECTION_HEADERS:
+            return SECTION_HEADERS[lower + ":"]
+
+        # check if line starts with a section header
+        for header, section_type in SECTION_HEADERS.items():
+            if lower.startswith(header):
+                return section_type
+
+        return SectionType.UNKNOWN
+
+    def _looks_like_other_format(self, docstring: str) -> bool:
+        """Check if docstring looks like sphinx or google format.
+
+        arguments:
+            `docstring: str`
+                docstring to check
+
+        returns: `bool`
+            True if appears to be another format
+        """
+        # sphinx patterns
+        sphinx_patterns = [
+            r":param\s+\w+:",
+            r":returns?:",
+            r":raises?:",
+            r":type\s+\w+:",
+            r":rtype:",
+        ]
+
+        # google patterns
+        google_patterns = [
+            r"^\s*Args:\s*$",
+            r"^\s*Returns:\s*$",
+            r"^\s*Raises:\s*$",
+            r"^\s*Yields:\s*$",
+            r"^\s*Examples:\s*$",
+        ]
+
+        for pattern in sphinx_patterns:
+            if re.search(pattern, docstring, re.MULTILINE):
+                return True
+
+        for pattern in google_patterns:
+            if re.search(pattern, docstring, re.MULTILINE):
+                return True
+
+        return False
+
+    def _parse_section_content(self, section: Section) -> None:
+        """Parse the content of a section.
+
+        arguments:
+            `section: Section`
+                section to parse
+        """
+        if section.section_type in (
+            SectionType.ATTRIBUTES,
+            SectionType.ARGUMENTS,
+            SectionType.PARAMETERS,
+        ):
+            section.items.extend(
+                self._parse_parameters(section.content, section.location)
+            )
+        elif section.section_type in (
+            SectionType.FUNCTIONS,
+            SectionType.METHODS,
+        ):
+            section.items.extend(
+                self._parse_functions(section.content, section.location)
+            )
+        elif section.section_type == SectionType.RAISES:
+            section.items.extend(
+                self._parse_raises(section.content, section.location)
+            )
+        elif section.section_type == SectionType.RETURNS:
+            section.items.extend(
+                self._parse_returns(section.content, section.location)
+            )
+
+    def _parse_parameters(
+        self, content: list[str], base_location: Location | None
+    ) -> list[ParameterDoc]:
+        """Parse parameter or attribute declarations.
+
+        arguments:
+            `content: list[str]`
+                section content lines
+            `base_location: Location | None`
+                base location for line numbers
+
+        returns: `list[ParameterDoc]`
+            parsed parameters
+        """
+        parameters: list[ParameterDoc] = []
+        current_param: ParameterDoc | None = None
+
+        for i, line in enumerate(content):
+            stripped = line.strip()
+
+            if not stripped:
+                continue
+
+            # check for backtick-wrapped declaration
+            if stripped.startswith("`") and "`" in stripped[1:]:
+                if current_param:
+                    parameters.append(current_param)
+
+                backtick_end = stripped.find("`", 1)
+                if backtick_end > 0:
+                    declaration = stripped[1:backtick_end]
+                    desc = stripped[backtick_end + 1 :].strip()
+
+                    name, type_ann, default = self._parse_declaration(
+                        declaration
+                    )
+
+                    line_num = (base_location.line if base_location else 0) + i
+                    current_param = ParameterDoc(
+                        name=name,
+                        type_annotation=type_ann,
+                        default_value=default,
+                        description=[desc] if desc else [],
+                        location=Location(
+                            line_num,
+                            line.index("`"),
+                            base_location.file if base_location else None,
+                        ),
+                    )
+            elif current_param is not None:
+                current_param.description.append(stripped)
+
+        if current_param:
+            parameters.append(current_param)
+
+        return parameters
+
+    def _parse_functions(
+        self, content: list[str], base_location: Location | None
+    ) -> list[FunctionDoc]:
+        """Parse function or method declarations.
+
+        arguments:
+            `content: list[str]`
+                section content lines
+            `base_location: Location | None`
+                base location for line numbers
+
+        returns: `list[FunctionDoc]`
+            parsed functions
+        """
+        functions: list[FunctionDoc] = []
+        current_func: FunctionDoc | None = None
+        collecting_signature = False
+        signature_lines: list[str] = []
+
+        for i, line in enumerate(content):
+            stripped = line.strip()
+
+            if not stripped:
+                continue
+
+            if stripped.startswith("`def ") or stripped.startswith(
+                "`async def "
+            ):
+                if current_func:
+                    functions.append(current_func)
+
+                collecting_signature = True
+                signature_lines = [stripped]
+
+                if stripped.endswith("`"):
+                    collecting_signature = False
+                    signature = stripped[1:-1]
+                    line_num = (base_location.line if base_location else 0) + i
+                    current_func = FunctionDoc(
+                        signature=signature,
+                        location=Location(
+                            line_num,
+                            line.index("`"),
+                            base_location.file if base_location else None,
+                        ),
+                    )
+            elif collecting_signature:
+                signature_lines.append(stripped)
+                if stripped.endswith("`"):
+                    collecting_signature = False
+                    full_sig = " ".join(
+                        s.strip().rstrip("`") for s in signature_lines
+                    )
+                    full_sig = full_sig.lstrip("`")
+                    line_num = (base_location.line if base_location else 0) + i
+                    current_func = FunctionDoc(
+                        signature=full_sig,
+                        location=Location(
+                            line_num,
+                            0,
+                            base_location.file if base_location else None,
+                        ),
+                    )
+            elif current_func is not None:
+                current_func.description.append(stripped)
+
+        if current_func:
+            functions.append(current_func)
+
+        return functions
+
+    def _parse_raises(
+        self, content: list[str], base_location: Location | None
+    ) -> list[ExceptionDoc]:
+        """Parse raises section content.
+
+        arguments:
+            `content: list[str]`
+                section content lines
+            `base_location: Location | None`
+                base location for line numbers
+
+        returns: `list[ExceptionDoc]`
+            parsed exceptions
+        """
+        exceptions: list[ExceptionDoc] = []
+        current_exc: ExceptionDoc | None = None
+
+        for i, line in enumerate(content):
+            stripped = line.strip()
+
+            if not stripped:
+                continue
+
+            # single-line format: raises: `Exception`
+            if stripped.lower().startswith("raises:") and "`" in stripped:
+                backtick_start = stripped.find("`")
+                backtick_end = stripped.find("`", backtick_start + 1)
+                if backtick_end > backtick_start:
+                    exc_class = stripped[backtick_start + 1 : backtick_end]
+                    desc = stripped[backtick_end + 1 :].strip()
+                    line_num = (base_location.line if base_location else 0) + i
+                    exceptions.append(
+                        ExceptionDoc(
+                            exception_class=exc_class,
+                            description=[desc] if desc else [],
+                            location=Location(
+                                line_num,
+                                backtick_start,
+                                base_location.file if base_location else None,
+                            ),
+                        )
+                    )
+                continue
+
+            # multi-line format
+            if stripped.startswith("`") and "`" in stripped[1:]:
+                if current_exc:
+                    exceptions.append(current_exc)
+
+                backtick_end = stripped.find("`", 1)
+                exc_class = stripped[1:backtick_end]
+                desc = stripped[backtick_end + 1 :].strip()
+                line_num = (base_location.line if base_location else 0) + i
+                current_exc = ExceptionDoc(
+                    exception_class=exc_class,
+                    description=[desc] if desc else [],
+                    location=Location(
+                        line_num,
+                        line.index("`"),
+                        base_location.file if base_location else None,
+                    ),
+                )
+            elif current_exc is not None:
+                current_exc.description.append(stripped)
+
+        if current_exc:
+            exceptions.append(current_exc)
+
+        return exceptions
+
+    def _parse_returns(
+        self, content: list[str], base_location: Location | None
+    ) -> list[ReturnDoc]:
+        """Parse returns section content.
+
+        arguments:
+            `content: list[str]`
+                section content lines
+            `base_location: Location | None`
+                base location for line numbers
+
+        returns: `list[ReturnDoc]`
+            parsed return types
+        """
+        returns: list[ReturnDoc] = []
+        current_return: ReturnDoc | None = None
+
+        for i, line in enumerate(content):
+            stripped = line.strip()
+
+            if not stripped:
+                continue
+
+            # single-line format: returns: `Type`
+            if stripped.lower().startswith("returns:") and "`" in stripped:
+                if current_return:
+                    returns.append(current_return)
+
+                backtick_start = stripped.find("`")
+                backtick_end = stripped.find("`", backtick_start + 1)
+                if backtick_end > backtick_start:
+                    type_ann = stripped[backtick_start + 1 : backtick_end]
+                    desc = stripped[backtick_end + 1 :].strip()
+                    line_num = (base_location.line if base_location else 0) + i
+                    current_return = ReturnDoc(
+                        type_annotation=type_ann,
+                        description=[desc] if desc else [],
+                        location=Location(
+                            line_num,
+                            backtick_start,
+                            base_location.file if base_location else None,
+                        ),
+                    )
+                continue
+
+            # multi-line format
+            if stripped.startswith("`") and "`" in stripped[1:]:
+                if current_return:
+                    returns.append(current_return)
+
+                backtick_end = stripped.find("`", 1)
+                type_ann = stripped[1:backtick_end]
+                desc = stripped[backtick_end + 1 :].strip()
+                line_num = (base_location.line if base_location else 0) + i
+                current_return = ReturnDoc(
+                    type_annotation=type_ann,
+                    description=[desc] if desc else [],
+                    location=Location(
+                        line_num,
+                        line.index("`"),
+                        base_location.file if base_location else None,
+                    ),
+                )
+            elif current_return is not None:
+                current_return.description.append(stripped)
+
+        if current_return:
+            returns.append(current_return)
+
+        return returns
+
+    def _parse_declaration(
+        self, declaration: str
+    ) -> tuple[str, str, str | None]:
+        """Parse a variable declaration like 'name: str = "default"'.
+
+        arguments:
+            `declaration: str`
+                declaration string without backticks
+
+        returns: `tuple[str, str, str | None]`
+            (name, type_annotation, default_value)
+        """
+        name = ""
+        type_ann = ""
+        default = None
+
+        if ":" in declaration:
+            colon_pos = declaration.index(":")
+            name = declaration[:colon_pos].strip()
+            rest = declaration[colon_pos + 1 :].strip()
+
+            if "=" in rest:
+                eq_pos = rest.index("=")
+                type_ann = rest[:eq_pos].strip()
+                default = rest[eq_pos + 1 :].strip()
+            else:
+                type_ann = rest
+        else:
+            name = declaration.strip()
+
+        return name, type_ann, default
+
+    def _validate_section_order(
+        self, parsed: ParsedDocstring, line_offset: int
+    ) -> None:
+        """Validate that sections are in correct order.
+
+        arguments:
+            `parsed: ParsedDocstring`
+                parsed docstring to validate
+            `line_offset: int`
+                starting line number
+        """
+        last_order = -1
+        for section in parsed.sections:
+            current_order = SECTION_ORDER.get(section.section_type, 99)
+            if current_order < last_order:
+                line_num = (
+                    section.location.line if section.location else line_offset
+                )
+                self.diagnostics.add_error(
+                    ErrorCode.SECTIONS_OUT_OF_ORDER,
+                    f"section '{section.section_type.name}' is out of order",
+                    line_num,
+                )
+            last_order = current_order
 
 
-def _extract_function_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionSignature:
-    """
-    extract function signature from ast node
-
-    extracts parameter names, types, and defaults, return type, and raised
-    exceptions from a function or async function definition
+def parse_docstring(
+    docstring: str, file_path: str | None = None, line_offset: int = 1
+) -> ParsedDocstring:
+    """Convenience function to parse a docstring.
 
     arguments:
-        `node: ast.FunctionDef | ast.AsyncFunctionDef`
-            function or async function node
+        `docstring: str`
+            the docstring to parse
+        `file_path: str | None = None`
+            path to source file
+        `line_offset: int = 1`
+            starting line number
 
-    returns:
-        `FunctionSignature`
-            structured representation of the function signature
+    returns: `ParsedDocstring`
+        parsed docstring structure
     """
-    parameters = {}
-
-    for arg in node.args.posonlyargs:
-        param_str = arg.arg
-        if arg.annotation:
-            param_str += f": {_type_annotation_to_str(arg.annotation)}"
-        parameters[arg.arg] = param_str
-
-    for arg in node.args.args:
-        param_str = arg.arg
-        if arg.annotation:
-            param_str += f": {_type_annotation_to_str(arg.annotation)}"
-        parameters[arg.arg] = param_str
-
-    for arg in node.args.kwonlyargs:
-        param_str = arg.arg
-        if arg.annotation:
-            param_str += f": {_type_annotation_to_str(arg.annotation)}"
-        parameters[arg.arg] = param_str
-
-    if node.args.vararg:
-        param_str = f"*{node.args.vararg.arg}"
-        if node.args.vararg.annotation:
-            param_str += f": {_type_annotation_to_str(node.args.vararg.annotation)}"
-        parameters[node.args.vararg.arg] = param_str
-
-    if node.args.kwarg:
-        param_str = f"**{node.args.kwarg.arg}"
-        if node.args.kwarg.annotation:
-            param_str += f": {_type_annotation_to_str(node.args.kwarg.annotation)}"
-        parameters[node.args.kwarg.arg] = param_str
-
-    defaults = {
-        arg.arg: _type_annotation_to_str(default)
-        for arg, default in zip(
-            reversed(node.args.args),
-            reversed(node.args.defaults),
-        )
-    }
-
-    for param, default in defaults.items():
-        parameters[param] += f" = {default}"
-
-    returns_type = _type_annotation_to_str(node.returns)
-
-    raises = _extract_raises(node)
-
-    return FunctionSignature(
-        name=node.name,
-        parameters=parameters,
-        return_type=returns_type,
-        raises=raises,
-    )
-
-
-def get_docstring_from_node(node: ast.AST) -> str | None:
-    """
-    get docstring from ast node
-
-    returns: docstring for module, class, function, or async function nodes
-
-    arguments:
-        `node: ast.AST`
-            ast node to get docstring from
-
-    returns:
-        `str | None`
-            docstring text or none if not found
-    """
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
-        return ast.get_docstring(node)
-    return None
-
-
-def find_third_party_references(parsed: ParsedCode) -> set[str]:
-    """
-    find third-party module references from parsed code
-
-    scans class base classes to find references to external modules that are not
-    part of the typing module
-
-    arguments:
-        `parsed: ParsedCode`
-            parsed code structure
-
-    returns:
-        `set[str]`
-            set of third-party module references
-    """
-    refs = set()
-
-    for class_sig in parsed.classes:
-        for base in class_sig.bases:
-            if "." in base and not base.startswith("typing."):
-                refs.add(base)
-
-    return refs
+    parser = MDFParser(file_path)
+    return parser.parse(docstring, line_offset)

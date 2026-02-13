@@ -1,0 +1,96 @@
+# the default configuration for meadoc, a docstring machine based on typing
+# information for the meadow Docstring Format
+# 
+# all available configuration keys are exposed here with their defaults,
+# alongside comments to explain what they do, and what values they accept
+
+[meadoc]
+# source file resolution
+# glob patterns to include/exclude/ignore files and directories
+include = [
+    # "src/**/*.py",
+    # "tests/**/*.py",
+]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+# meadoc will by default respect .gitignores when looking for python files
+# especially when no sources are specified, e.g. running `meadoc check`
+# without arguments in the project root
+respect-gitignore = true
+
+multi-line-summary-on-line = 2
+# options: 1 or 2, change to 1 for strict PEP 257 compliance
+# 
+# multi-line-summary-on-line = 1
+# > """preamble
+# > 
+# > body
+# > """
+# 
+# multi-line-summary-on-line = 2
+# > """
+# > preamble
+# > 
+# > body
+# > """
+
+[meadoc.format]
+# module docstrings usually have more varied styling/writing,
+# so it is disabled by default
+module-docstrings = false
+
+# docstring formatting preferences
+line-length = 79
+line-ending = ""  # empty = autodetect
+indent-width = 4
+indent-style = "space"  # or 'tabs'
+
+# any detected python code blocks can be formatted with a command of your choice
+# skip on a docstring-by-docstring basis with `# meadow: ignore[codeBlockFormat]`
+code-block-format = true
+code-block-format-command = ["ruff", "format", "-"]
+
+[meadoc.generate]
+external-link-reference = "meadoc.toml"
+
+# markdown formatting preferences
+line-length = 79
+line-ending = ""  # empty = autodetect
+indent-width = 4
+indent-style = "space"  # or 'tabs'
+
+[meadoc.generate.external-links]
+# this is not actually included with the default configuration,
+# but an example of how external links would be configured.
+#
+# on running `meadoc format` or `meadoc check`, any third party modules
+# encountered will be noted down here, allowing you to add links to them if
+# you would want clickable links in the generated markdown.
+"tomlkit.TOMLDocument" = "https://tomlkit.readthedocs.io/en/latest/api/#tomlkit.TOMLDocument"

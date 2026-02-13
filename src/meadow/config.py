@@ -1,251 +1,526 @@
-"""
-configuration handling for meadoc.
+"""configuration loading and management for meadow.
 
-loads configuration from multiple sources (cli, pyproject.toml, meadow.toml)
-with support for precedence and merging of ignore rules.
+with all my heart, 2026, mark joshwel <mark@joshwel.co>
+SPDX-License-Identifier: Unlicense OR 0BSD
+
+this module handles loading configuration from pyproject.toml, meadoc.toml,
+and .meadoc.toml files, as well as command-line argument processing.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Literal
 
-import tomllib
+import tomlkit
+from tomlkit import TOMLDocument
+from tomlkit.items import Table
+
+from meadow.errors import ConfigError, Location
+
+
+# constants
+DEFAULT_INCLUDE_PATTERNS: list[str] = [
+    "src/**/*.py",
+    "tests/**/*.py",
+]
+
+DEFAULT_EXCLUDE_PATTERNS: list[str] = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pycache__",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+CONFIG_SEARCH_ORDER: list[str] = [
+    ".meadoc.toml",
+    "meadoc.toml",
+    "pyproject.toml",
+]
+
+SUMMARY_LINE_OPTIONS: tuple[int, ...] = (1, 2)
+INDENT_STYLE_OPTIONS: tuple[str, ...] = ("space", "tab")
+
+
+def _get_bool(table: Table, key: str) -> bool | None:
+    """Safely get a boolean value from a TOML table."""
+    value = table.get(key)
+    if isinstance(value, bool):
+        return value
+    return None
+
+
+def _get_int(table: Table, key: str) -> int | None:
+    """Safely get an integer value from a TOML table."""
+    value = table.get(key)
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def _get_str(table: Table, key: str) -> str | None:
+    """Safely get a string value from a TOML table."""
+    value = table.get(key)
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def _get_list(table: Table, key: str) -> list[object] | None:
+    """Safely get a list value from a TOML table."""
+    value = table.get(key)
+    if isinstance(value, list):
+        return value  # type: ignore[return-value]
+    return None
+
+
+def _get_table(table: Table, key: str) -> Table | None:
+    """Safely get a table value from a TOML table."""
+    value = table.get(key)
+    if isinstance(value, Table):
+        return value
+    return None
+
+
+@dataclass
+class FormatConfig:
+    """configuration for the format subcommand.
+
+    Controls how docstrings are formatted and generated.
+
+    attributes:
+        `module_docstrings: bool = False`
+            whether to generate docstrings for modules
+        `line_length: int = 79`
+            maximum line length for docstrings
+        `line_ending: str = ""`
+            line ending to use (empty = autodetect)
+        `indent_width: int = 4`
+            number of spaces/tabs for indentation
+        `indent_style: Literal["space", "tab"] = "space"`
+            whether to use spaces or tabs
+        `code_block_format: bool = True`
+            whether to format code blocks
+        `code_block_format_command: list[str]`
+            command to format code blocks
+        `multi_line_summary_on_line: Literal[1, 2] = 2`
+            which line to place multi-line summary on
+    """
+
+    module_docstrings: bool = False
+    line_length: int = 79
+    line_ending: str = ""  # empty = autodetect
+    indent_width: int = 4
+    indent_style: Literal["space", "tab"] = "space"
+    code_block_format: bool = True
+    code_block_format_command: list[str] = field(
+        default_factory=lambda: ["ruff", "format", "-"]
+    )
+    multi_line_summary_on_line: Literal[1, 2] = 2
+
+
+@dataclass
+class GenerateConfig:
+    """configuration for the generate subcommand.
+
+    Controls how markdown API documentation is generated.
+
+    attributes:
+        `external_link_reference: str = "meadoc.toml"`
+            file to store external link definitions
+        `line_length: int = 79`
+            maximum line length for markdown output
+        `line_ending: str = ""`
+            line ending to use (empty = autodetect)
+        `indent_width: int = 4`
+            number of spaces/tabs for indentation
+        `indent_style: Literal["space", "tab"] = "space"`
+            whether to use spaces or tabs
+        `external_links: dict[str, str]`
+            mapping of type names to documentation URLs
+        `starting_header_level: Literal[1, 2, 3, 4, 5, 6] = 2`
+            starting header level for api reference title
+        `include_toc: bool = True`
+            whether to include table of contents
+    """
+
+    external_link_reference: str = "meadoc.toml"
+    line_length: int = 79
+    line_ending: str = ""  # empty = autodetect
+    indent_width: int = 4
+    indent_style: Literal["space", "tab"] = "space"
+    external_links: dict[str, str] = field(default_factory=dict)
+    starting_header_level: Literal[1, 2, 3, 4, 5, 6] = 2
+    include_toc: bool = True
 
 
 @dataclass
 class Config:
-    """
-    configuration for meadoc
+    """complete meadow configuration.
+
+    Aggregates all configuration options for the meadoc tool.
 
     attributes:
-        `extend_ignore: list[str]`
-            list of error codes to ignore
-        `links: dict[str, str]`
-            mapping of external types to documentation urls
-        `todoc_message: str`
-            placeholder text for undocumented items
+        `include: list[str]`
+            glob patterns for files to include
+        `exclude: list[str]`
+            glob patterns for files to exclude
+        `respect_gitignore: bool = True`
+            whether to respect .gitignore files
+        `multi_line_summary_on_line: Literal[1, 2] = 2`
+            which line to place multi-line summary on
+        `format: FormatConfig`
+            format subcommand configuration
+        `generate: GenerateConfig`
+            generate subcommand configuration
 
-    returns:
-        `Config`
-            config instance
+    examples:
+        ```python
+        # Load from default locations
+        config = Config.load()
+
+        # Create with defaults
+        config = Config.default()
+
+        # Access settings
+        print(config.format.line_length)
+        ```
     """
 
-    extend_ignore: list[str] = field(default_factory=list)
-    links: dict[str, str] = field(default_factory=dict)
-    todoc_message: str = "TODOC: (meadow)"
+    include: list[str] = field(default_factory=list)
+    exclude: list[str] = field(default_factory=list)
+    respect_gitignore: bool = True
+    multi_line_summary_on_line: Literal[1, 2] = 2
+    format: FormatConfig = field(default_factory=FormatConfig)
+    generate: GenerateConfig = field(default_factory=GenerateConfig)
 
+    @classmethod
+    def default(cls) -> Config:
+        """Create a configuration with default values.
 
-def parse_extend_ignore(value: Any) -> list[str]:
-    """
-    parse extend-ignore configuration value
-
-    handles string (comma-separated or single), list, or other types
-
-    arguments:
-        `value: Any`
-            configuration value to parse
-
-    returns:
-        `list[str]`
-            list of error code strings
-    """
-    if isinstance(value, str):
-        if "," in value:
-            return [code.strip() for code in value.split(",") if code.strip()]
-        return [value]
-    if isinstance(value, list):
-        return value
-    return []
-
-
-def load_pyproject_config(path: Path | None = None) -> Config:
-    """
-    load configuration from pyproject.toml
-
-    reads: `[tool.meadoc]` section from pyproject.toml
-
-    arguments:
-        `path: Path | None = None`
-            path to pyproject.toml, defaults to current directory
-
-    returns:
-        `Config`
-            loaded configuration, or empty config if file not found
-    """
-    if path is None:
-        path = Path.cwd()
-
-    pyproject = path / "pyproject.toml"
-    if not pyproject.exists():
-        return Config()
-
-    with pyproject.open("rb") as f:
-        data = tomllib.load(f)
-
-    meadoc_config = data.get("tool", {}).get("meadoc", {})
-
-    config = Config()
-
-    if "extend-ignore" in meadoc_config:
-        config.extend_ignore = parse_extend_ignore(meadoc_config["extend-ignore"])
-
-    if "todoc-message" in meadoc_config:
-        config.todoc_message = meadoc_config["todoc-message"]
-
-    return config
-
-
-def load_meadow_config(path: Path | None = None) -> Config:
-    """
-    load configuration from meadow.toml
-
-    reads configuration from meadow.toml in the specified directory
-
-    arguments:
-        `path: Path | None = None`
-            path to meadow.toml, defaults to current directory
-
-    returns:
-        `Config`
-            loaded configuration, or empty config if file not found
-    """
-    if path is None:
-        path = Path.cwd()
-
-    meadow_toml = path / "meadow.toml"
-    if not meadow_toml.exists():
-        return Config()
-
-    with meadow_toml.open("rb") as f:
-        data = tomllib.load(f)
-
-    config = Config()
-
-    if "extend-ignore" in data:
-        config.extend_ignore = parse_extend_ignore(data["extend-ignore"])
-
-    if "links" in data:
-        config.links = data["links"]
-
-    if "todoc-message" in data:
-        config.todoc_message = data["todoc-message"]
-
-    return config
-
-
-def merge_configs(
-    pyproject_config: Config,
-    meadow_config: Config,
-    cli_ignore: list[str] | None = None,
-    cli_todoc_message: str | None = None,
-) -> Config:
-    """
-    merge configurations with cli taking precedence
-
-    merges configurations in priority order:
-    1. cli flags (highest)
-    2. pyproject.toml
-    3. meadow.toml (lowest)
-
-    arguments:
-        `pyproject_config: Config`
-            configuration from pyproject.toml
-        `meadow_config: Config`
-            configuration from meadow.toml
-        `cli_ignore: list[str] | None = None`
-            cli error codes to ignore
-        `cli_todoc_message: str | None = None`
-            cli todoc message override
-
-    returns:
-        `Config`
-            merged configuration
-    """
-    config = Config()
-
-    if pyproject_config.extend_ignore:
-        config.extend_ignore = pyproject_config.extend_ignore.copy()
-
-    if meadow_config.extend_ignore:
-        config.extend_ignore.extend(
-            code for code in meadow_config.extend_ignore if code not in config.extend_ignore
+        returns: `Config`
+            configuration populated with default values
+        """
+        return cls(
+            include=list(DEFAULT_INCLUDE_PATTERNS),
+            exclude=list(DEFAULT_EXCLUDE_PATTERNS),
+            respect_gitignore=True,
+            multi_line_summary_on_line=2,
+            format=FormatConfig(),
+            generate=GenerateConfig(),
         )
 
-    if meadow_config.links:
-        config.links = meadow_config.links.copy()
+    @classmethod
+    def load(cls, start_path: Path | None = None) -> Config:
+        """Load configuration from available config files.
 
-    if pyproject_config.todoc_message:
-        config.todoc_message = pyproject_config.todoc_message
+        Searches for configuration files in order of precedence:
+        1. .meadoc.toml
+        2. meadoc.toml
+        3. pyproject.toml
 
-    if meadow_config.todoc_message:
-        config.todoc_message = meadow_config.todoc_message
+        arguments:
+            `start_path: Path | None = None`
+                directory to start searching from (defaults to cwd)
 
-    if cli_ignore:
-        for code in cli_ignore:
-            if code not in config.extend_ignore:
-                config.extend_ignore.append(code)
+        returns: `Config`
+            loaded configuration with defaults applied
 
-    if cli_todoc_message:
-        config.todoc_message = cli_todoc_message
+        raises:
+            `ConfigError`
+                if a config file exists but cannot be parsed
+        """
+        config = cls.default()
 
-    return config
+        if start_path is None:
+            start_path = Path.cwd()
+
+        # search for config files in order of precedence
+        for filename in CONFIG_SEARCH_ORDER:
+            config_path = start_path / filename
+            if config_path.exists():
+                try:
+                    config._load_from_file(config_path)
+                    return config
+                except Exception as exc:
+                    raise ConfigError(
+                        message=f"Failed to parse {filename}: {exc}",
+                        location=Location(
+                            line=1,
+                            column=0,
+                            file=str(config_path),
+                        ),
+                    ) from exc
+
+        return config
+
+    def _load_from_file(self, path: Path) -> None:
+        """Load configuration from a TOML file.
+
+        arguments:
+            `path: Path`
+                path to the configuration file
+
+        raises:
+            `ConfigError`
+                if the file cannot be read or contains invalid values
+        """
+        try:
+            content = path.read_text(encoding="utf-8")
+            doc: TOMLDocument = tomlkit.parse(content)
+        except OSError as exc:
+            raise ConfigError(
+                message=f"Cannot read config file: {exc}",
+                location=Location(line=1, column=0, file=str(path)),
+            ) from exc
+
+        # determine the config table based on file type
+        config_table: Table | None = None
+
+        if path.name == "pyproject.toml":
+            tool_table = _get_table(doc, "tool")  # type: ignore[arg-type]
+            if tool_table:
+                config_table = _get_table(tool_table, "meadoc")
+        else:
+            config_table = _get_table(doc, "meadoc")  # type: ignore[arg-type]
+
+        if config_table is None:
+            return
+
+        # load top-level options
+        include_value = _get_list(config_table, "include")
+        if include_value:
+            self.include = [str(item) for item in include_value]
+
+        exclude_value = _get_list(config_table, "exclude")
+        if exclude_value:
+            self.exclude = [str(item) for item in exclude_value]
+
+        respect_value = _get_bool(config_table, "respect-gitignore")
+        if respect_value is not None:
+            self.respect_gitignore = respect_value
+
+        summary_value = _get_int(config_table, "multi-line-summary-on-line")
+        if summary_value is not None and summary_value in SUMMARY_LINE_OPTIONS:
+            self.multi_line_summary_on_line = summary_value  # type: ignore[assignment]
+
+        # load format section
+        format_table = _get_table(config_table, "format")
+        if format_table:
+            self._load_format_config(format_table)
+
+        # load generate section
+        generate_table = _get_table(config_table, "generate")
+        if generate_table:
+            self._load_generate_config(generate_table)
+
+    def _load_format_config(self, table: Table) -> None:
+        """Load format configuration from a TOML table.
+
+        arguments:
+            `table: Table`
+                the [meadoc.format] or [tool.meadoc.format] table
+        """
+        module_docstrings = _get_bool(table, "module-docstrings")
+        if module_docstrings is not None:
+            self.format.module_docstrings = module_docstrings
+
+        line_length = _get_int(table, "line-length")
+        if line_length is not None and line_length > 0:
+            self.format.line_length = line_length
+
+        line_ending = _get_str(table, "line-ending")
+        if line_ending is not None:
+            self.format.line_ending = line_ending
+
+        indent_width = _get_int(table, "indent-width")
+        if indent_width is not None and indent_width > 0:
+            self.format.indent_width = indent_width
+
+        indent_style = _get_str(table, "indent-style")
+        if indent_style is not None and indent_style in INDENT_STYLE_OPTIONS:
+            self.format.indent_style = indent_style  # type: ignore[assignment]
+
+        code_block_format = _get_bool(table, "code-block-format")
+        if code_block_format is not None:
+            self.format.code_block_format = code_block_format
+
+        code_block_command = _get_list(table, "code-block-format-command")
+        if code_block_command:
+            self.format.code_block_format_command = [
+                str(item) for item in code_block_command
+            ]
+
+        summary_line = _get_int(table, "multi-line-summary-on-line")
+        if summary_line is not None and summary_line in SUMMARY_LINE_OPTIONS:
+            self.format.multi_line_summary_on_line = summary_line  # type: ignore[assignment]
+
+    def _load_generate_config(self, table: Table) -> None:
+        """Load generate configuration from a TOML table.
+
+        arguments:
+            `table: Table`
+                the [meadoc.generate] or [tool.meadoc.generate] table
+        """
+        external_link_ref = _get_str(table, "external-link-reference")
+        if external_link_ref is not None:
+            self.generate.external_link_reference = external_link_ref
+
+        line_length = _get_int(table, "line-length")
+        if line_length is not None and line_length > 0:
+            self.generate.line_length = line_length
+
+        line_ending = _get_str(table, "line-ending")
+        if line_ending is not None:
+            self.generate.line_ending = line_ending
+
+        indent_width = _get_int(table, "indent-width")
+        if indent_width is not None and indent_width > 0:
+            self.generate.indent_width = indent_width
+
+        indent_style = _get_str(table, "indent-style")
+        if indent_style is not None and indent_style in INDENT_STYLE_OPTIONS:
+            self.generate.indent_style = indent_style  # type: ignore[assignment]
+
+        external_links = _get_table(table, "external-links")
+        if external_links:
+            self.generate.external_links = {
+                str(key): str(value) for key, value in external_links.items()
+            }
+
+    def to_example_toml(self, table_name: str = "meadoc") -> str:
+        """Generate example TOML configuration as a string.
+
+        arguments:
+            `table_name: str = "meadoc"`
+                the table name to use ("meadoc" or "tool.meadoc")
+
+        returns: `str`
+            formatted TOML configuration
+        """
+        lines: list[str] = [
+            f"# example {table_name}.toml configuration",
+            "",
+            f"[{table_name}]",
+            "# source file resolution",
+            "# glob patterns to include/exclude/ignore files and directories",
+            "include = [",
+        ]
+
+        for pattern in self.include:
+            lines.append(f'    "{pattern}",')
+        lines.append("]")
+
+        lines.append("exclude = [")
+        for pattern in self.exclude:
+            lines.append(f'    "{pattern}",')
+        lines.append("]")
+
+        lines.extend(
+            [
+                "",
+                "# meadoc will by default respect .gitignores",
+                f"respect-gitignore = {str(self.respect_gitignore).lower()}",
+                "",
+                f"multi-line-summary-on-line = {self.multi_line_summary_on_line}",
+                "",
+                f"[{table_name}.format]",
+                "# module docstrings usually have more varied styling/writing,",
+                "# so it is disabled by default",
+                f"module-docstrings = {str(self.format.module_docstrings).lower()}",
+                "",
+                "# docstring formatting preferences",
+                f"line-length = {self.format.line_length}",
+                f'line-ending = "{self.format.line_ending}"',
+                f"indent-width = {self.format.indent_width}",
+                f'indent-style = "{self.format.indent_style}"',
+                "",
+                "# any detected python code blocks can be formatted",
+                f"code-block-format = {str(self.format.code_block_format).lower()}",
+                "code-block-format-command = [",
+            ]
+        )
+
+        for cmd in self.format.code_block_format_command:
+            lines.append(f'    "{cmd}",')
+        lines.append("]")
+
+        lines.extend(
+            [
+                "",
+                f"[{table_name}.generate]",
+                f'external-link-reference = "{self.generate.external_link_reference}"',
+                "",
+                "# markdown formatting preferences",
+                f"line-length = {self.generate.line_length}",
+                f'line-ending = "{self.generate.line_ending}"',
+                f"indent-width = {self.generate.indent_width}",
+                f'indent-style = "{self.generate.indent_style}"',
+                "",
+            ]
+        )
+
+        if self.generate.external_links:
+            lines.append(f"[{table_name}.generate.external-links]")
+            for key, value in self.generate.external_links.items():
+                lines.append(f'{key} = "{value}"')
+            lines.append("")
+
+        return "\n".join(lines)
 
 
-def load_config(
-    cli_ignore: list[str] | None = None,
-    cli_todoc_message: str | None = None,
-    path: Path | None = None,
-) -> Config:
-    """
-    load and merge all configuration sources
+def find_project_root(start_path: Path | None = None) -> Path:
+    """Find the project root directory.
 
-    loads configuration from all sources and merges them with cli taking
-    precedence
+    Searches for common project indicators like .git, pyproject.toml,
+    and meadoc.toml files.
 
     arguments:
-        `cli_ignore: list[str] | None = None`
-            cli error codes to ignore
-        `cli_todoc_message: str | None = None`
-            cli todoc message override
-        `path: Path | None = None`
-            path to config directory, defaults to current directory
+        `start_path: Path | None = None`
+            directory to start searching from (defaults to cwd)
 
-    returns:
-        `Config`
-            merged configuration
+    returns: `Path`
+        the project root directory, or start_path if none found
     """
-    if path is None:
-        path = Path.cwd()
+    if start_path is None:
+        start_path = Path.cwd()
 
-    pyproject_config = load_pyproject_config(path)
-    meadow_config = load_meadow_config(path)
+    indicators = [
+        ".git",
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        ".meadoc.toml",
+        "meadoc.toml",
+    ]
 
-    return merge_configs(pyproject_config, meadow_config, cli_ignore, cli_todoc_message)
+    for parent in [start_path, *start_path.parents]:
+        for indicator in indicators:
+            if (parent / indicator).exists():
+                return parent
 
-
-def write_meadow_config(path: Path, config: Config) -> None:
-    """
-    write configuration to meadow.toml
-
-    writes the given config to meadow.toml at the specified path
-
-    arguments:
-        `path: Path`
-            path to write meadow.toml
-        `config: Config`
-            configuration to write
-
-    returns:
-        `none`
-    """
-    toml_lines = []
-
-    toml_lines.append(f"extend-ignore = {config.extend_ignore if config.extend_ignore else []}")
-    toml_lines.append("")
-    toml_lines.append("[links]")
-    toml_lines.append("# discovered third party modules placed here automatically")
-
-    for key, value in config.links.items():
-        toml_lines.append(f'"{key}" = "{value}"')
-
-    path.write_text("\n".join(toml_lines))
+    return start_path
