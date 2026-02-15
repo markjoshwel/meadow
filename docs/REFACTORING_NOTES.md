@@ -34,7 +34,7 @@ raise ConfigError("Invalid config", location=Location(1, 0, "config.py"))
 #### `discovery.py`
 
 - **Removed**: Class-based `FileDiscovery`
-- **Added**: Pure functions `discover_python_files()`, `should_process_file()`
+- **Added**: Pure function `discover_python_files()` (thin wrapper)
 - **Changed**: Returns `list[Path]` instead of iterator (simpler type)
 
 #### `parser.py`

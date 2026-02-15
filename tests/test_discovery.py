@@ -6,11 +6,7 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 from pathlib import Path
 
 from meadow.config import Config
-from meadow.discovery import (
-    discover_python_files,
-    get_relative_path,
-    should_process_file,
-)
+from meadow.discovery import discover_python_files
 
 
 class TestDiscoverPythonFiles:
@@ -74,58 +70,3 @@ class TestDiscoverPythonFiles:
 
         assert len(files) == 1
         assert files[0].name == "script.py"
-
-
-class TestShouldProcessFile:
-    """test suite for should_process_file"""
-
-    def test_python_file_is_accepted(self, tmp_path: Path) -> None:
-        """Test that python files are accepted"""
-        py_file = tmp_path / "test.py"
-        py_file.write_text("# test")
-
-        config = Config.default()
-
-        assert should_process_file(py_file, config) is True
-
-    def test_non_python_file_is_rejected(self, tmp_path: Path) -> None:
-        """Test that non-python files are rejected"""
-        txt_file = tmp_path / "test.txt"
-        txt_file.write_text("test")
-
-        config = Config.default()
-
-        assert should_process_file(txt_file, config) is False
-
-    def test_excluded_file_is_rejected(self, tmp_path: Path) -> None:
-        """Test that excluded files are rejected"""
-        py_file = tmp_path / "__pycache__" / "test.py"
-        py_file.parent.mkdir()
-        py_file.write_text("# test")
-
-        config = Config.default()
-
-        assert should_process_file(py_file, config) is False
-
-
-class TestGetRelativePath:
-    """test suite for get_relative_path"""
-
-    def test_relative_path(self) -> None:
-        """Test getting relative path"""
-        base = Path("/home/user/project")
-        file = Path("/home/user/project/src/main.py")
-
-        result = get_relative_path(file, base)
-
-        # use as_posix() for cross-platform comparison
-        assert result.replace("\\", "/") == "src/main.py"
-
-    def test_absolute_path_when_not_relative(self) -> None:
-        """Test that absolute path is returned when not relative"""
-        base = Path("/home/user/project1")
-        file = Path("/home/user/project2/main.py")
-
-        result = get_relative_path(file, base)
-
-        assert result == str(file)

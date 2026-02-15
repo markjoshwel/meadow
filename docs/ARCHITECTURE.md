@@ -45,12 +45,9 @@ Depends on: errors (for ConfigError)
 
 ### `discovery.py`
 File system discovery:
-- `discover_python_files()` (main discovery function)
-- `should_process_file()` (filtering check)
-- `get_relative_path()` (path manipulation)
-- Gitignore pattern parsing and matching
+- `discover_python_files()` (thin wrapper around libsightseeing)
 
-Pure functions operating on Path objects. No classes.
+Uses libsightseeing for gitignore support and pattern matching.
 
 ### `parser.py`
 MDF docstring parsing:
