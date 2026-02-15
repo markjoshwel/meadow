@@ -6,7 +6,6 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 this module generates MDF-compliant docstrings from Python code elements.
 """
 
-from __future__ import annotations
 
 from pathlib import Path
 from typing import TypedDict

@@ -6,7 +6,6 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 main entry point for the meadoc command-line interface.
 """
 
-from __future__ import annotations
 
 import argparse
 import json

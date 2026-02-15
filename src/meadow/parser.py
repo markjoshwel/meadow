@@ -7,7 +7,6 @@ this module provides parsing capabilities for the meadow Docstring Format,
 converting docstrings into a structured representation.
 """
 
-from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field

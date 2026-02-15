@@ -7,7 +7,6 @@ this module provides validation of MDF docstrings against actual Python code,
 detecting issues like outdated information, missing sections, and malformed syntax.
 """
 
-from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field

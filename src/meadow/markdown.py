@@ -6,7 +6,6 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 this module generates markdown API reference documentation from MDF docstrings.
 """
 
-from __future__ import annotations
 
 import ast
 import sys

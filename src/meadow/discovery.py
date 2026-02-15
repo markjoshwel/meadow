@@ -4,8 +4,6 @@ with all my heart, 2026, mark joshwel <mark@joshwel.co>
 SPDX-License-Identifier: Unlicense OR 0BSD
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -19,7 +17,21 @@ def discover_python_files(
     config: Config,
     respect_gitignore: bool = True,
 ) -> Iterator[Path]:
-    """discover python files."""
+    """discover python files
+
+    arguments:
+        `sources: list[Path]`
+            source files or directories
+        `config: Config`
+            configuration
+        `respect_gitignore: bool = True`
+            respect gitignore files
+
+    yields: `Path`
+        paths to python files
+
+    returns: `Iterator[Path]`
+    """
     if not sources:
         sources = [Path.cwd()]
 
