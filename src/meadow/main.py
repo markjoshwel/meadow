@@ -350,9 +350,9 @@ def cmd_format(args: argparse.Namespace) -> int:
             summary_parts.append(f"{total_malformed} malformed")
 
         if summary_parts:
-            print(f"\n{', '.join(summary_parts)}")
+            print(f"{', '.join(summary_parts)}")
         else:
-            print("\nno changes needed")
+            print("no changes needed")
 
     return 0
 
@@ -451,9 +451,9 @@ def cmd_check(args: argparse.Namespace) -> int:
                 parts.append(f"{warning_count} warning(s)")
             if info_count:
                 parts.append(f"{info_count} info")
-            print(f"\n{', '.join(parts)}")
+            print(f"{', '.join(parts)}")
         else:
-            print("\nsuccess - no issues found")
+            print("success - no issues found")
 
     return 1 if has_errors else 0
 
