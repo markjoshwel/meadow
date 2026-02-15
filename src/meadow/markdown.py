@@ -57,15 +57,15 @@ class MarkdownGenerator:
         self.config = config or GenerateConfig()
 
     def generate_for_file(
-        self, file_path: Path, base_path: Path | None = None
+        self, file_path: Path, _base_path: Path | None = None
     ) -> Markdown:
         """generate markdown documentation for a python file
 
         arguments:
             `file_path: Path`
                 path to python file
-            `base_path: Path | None = None`
-                base path for relative links
+            `_base_path: Path | None = None`
+                base path for relative links (unused)
 
         returns: `Markdown`
             generated markdown content

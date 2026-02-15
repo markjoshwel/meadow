@@ -12,7 +12,57 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Literal, TypedDict, cast
+
+
+class FileResult(TypedDict):
+    """result type for file processing in format command
+
+    attributes:
+        `file: str`
+            path to the file
+        `generated: int`
+            number of docstrings generated
+        `updated: int`
+            number of docstrings updated
+        `skipped: int`
+            number of docstrings skipped
+        `malformed: int`
+            number of malformed docstrings
+    """
+
+    file: str
+    generated: int
+    updated: int
+    skipped: int
+    malformed: int
+
+
+class Issue(TypedDict):
+    """issue type for check command
+
+    attributes:
+        `file: str`
+            path to the file
+        `line: int`
+            line number
+        `column: int`
+            column number
+        `code: str`
+            error code
+        `message: str`
+            error message
+        `severity: str`
+            severity level
+    """
+
+    file: str
+    line: int
+    column: int
+    code: str
+    message: str
+    severity: str
+
 
 from ._version import __version__
 from .config import Config, find_project_root
@@ -215,22 +265,29 @@ def cmd_format(args: argparse.Namespace) -> int:
     config = Config.load()
 
     # update config from args
-    if args.include:
-        config.include = args.include
-    if args.exclude:
-        config.exclude.extend(args.exclude)
+    include_patterns = cast(list[str] | None, args.include)
+    exclude_patterns = cast(list[str] | None, args.exclude)
+    sources = cast(list[Path], args.source)
+    respect_gitignore_flag = not cast(bool, args.disrespect_gitignore)
+    plumbing_mode = cast(bool, args.plumbing)
+    fix_malformed_flag = cast(bool, args.fix_malformed)
+
+    if include_patterns:
+        config.include = include_patterns
+    if exclude_patterns:
+        config.exclude.extend(exclude_patterns)
 
     # discover files
     files = list(
         discover_python_files(
-            args.source,
+            sources,
             config,
-            respect_gitignore=not args.disrespect_gitignore,
+            respect_gitignore=respect_gitignore_flag,
         )
     )
 
     if not files:
-        if args.plumbing:
+        if plumbing_mode:
             print(json.dumps({"files": [], "summary": "no files found"}))
         else:
             print("no files found")
@@ -238,18 +295,23 @@ def cmd_format(args: argparse.Namespace) -> int:
 
     # process files
     updater = DocstringUpdater(config)
-    results: list[dict[str, Any]] = []
+    results: list[FileResult] = []
 
     for file_path in files:
         update_result = updater.update_file(
-            file_path, fix_malformed=args.fix_malformed
+            file_path, fix_malformed=fix_malformed_flag
         )
-        file_result: dict[str, Any] = dict(update_result)
-        file_result["file"] = str(file_path)
+        file_result: FileResult = {
+            "file": str(file_path),
+            "generated": update_result["generated"],
+            "updated": update_result["updated"],
+            "skipped": update_result["skipped"],
+            "malformed": update_result["malformed"],
+        }
         results.append(file_result)
 
     # output results
-    if args.plumbing:
+    if plumbing_mode:
         print(json.dumps({"files": results}))
     else:
         for result in results:
@@ -308,22 +370,28 @@ def cmd_check(args: argparse.Namespace) -> int:
     config = Config.load()
 
     # update config from args
-    if args.include:
-        config.include = args.include
-    if args.exclude:
-        config.exclude.extend(args.exclude)
+    include_patterns = cast(list[str] | None, args.include)
+    exclude_patterns = cast(list[str] | None, args.exclude)
+    sources = cast(list[Path], args.source)
+    respect_gitignore_flag = not cast(bool, args.disrespect_gitignore)
+    plumbing_mode = cast(bool, args.plumbing)
+
+    if include_patterns:
+        config.include = include_patterns
+    if exclude_patterns:
+        config.exclude.extend(exclude_patterns)
 
     # discover files
     files = list(
         discover_python_files(
-            args.source,
+            sources,
             config,
-            respect_gitignore=not args.disrespect_gitignore,
+            respect_gitignore=respect_gitignore_flag,
         )
     )
 
     if not files:
-        if args.plumbing:
+        if plumbing_mode:
             print(
                 json.dumps(
                     {"files": [], "issues": [], "summary": "no files found"}
@@ -335,14 +403,14 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     # validate files
     validator = MDFValidator(config)
-    all_issues: list[dict[str, Any]] = []
+    all_issues: list[Issue] = []
     has_errors = False
 
     for file_path in files:
         diagnostics = validator.validate_file(file_path)
 
         for diag in diagnostics:
-            issue = {
+            issue: Issue = {
                 "file": str(file_path),
                 "line": diag.line,
                 "column": diag.column,
@@ -356,7 +424,7 @@ def cmd_check(args: argparse.Namespace) -> int:
                 has_errors = True
 
     # output results
-    if args.plumbing:
+    if plumbing_mode:
         print(
             json.dumps(
                 {"files": [str(f) for f in files], "issues": all_issues}
@@ -365,8 +433,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     else:
         for issue in all_issues:
             print(
-                f"{issue['file']}:{issue['line']}:{issue['column']}: "
-                f"{issue['code']}: {issue['message']}"
+                f"{issue['file']}:{issue['line']}:{issue['column']}: {issue['code']}: {issue['message']}"
             )
 
         # print summary
@@ -404,27 +471,36 @@ def cmd_generate(args: argparse.Namespace) -> int:
     config = Config.load()
 
     # update config from args
-    if args.include:
-        config.include = args.include
-    if args.exclude:
-        config.exclude.extend(args.exclude)
+    include_patterns = cast(list[str] | None, args.include)
+    exclude_patterns = cast(list[str] | None, args.exclude)
+    sources = cast(list[Path], args.source)
+    respect_gitignore_flag = not cast(bool, args.disrespect_gitignore)
+    plumbing_mode = cast(bool, args.plumbing)
+    output_path_str = cast(str | None, args.output)
+    starting_header = cast(Literal[1, 2, 3, 4, 5, 6], args.starting_header)
+    no_toc = cast(bool, args.no_toc)
+
+    if include_patterns:
+        config.include = include_patterns
+    if exclude_patterns:
+        config.exclude.extend(exclude_patterns)
 
     # update generate config from CLI args
-    config.generate.starting_header_level = args.starting_header
-    if args.no_toc:
+    config.generate.starting_header_level = starting_header
+    if no_toc:
         config.generate.include_toc = False
 
     # discover files
     files = list(
         discover_python_files(
-            args.source,
+            sources,
             config,
-            respect_gitignore=not args.disrespect_gitignore,
+            respect_gitignore=respect_gitignore_flag,
         )
     )
 
     if not files:
-        if args.plumbing:
+        if plumbing_mode:
             print(
                 json.dumps(
                     {"files": [], "markdown": "", "summary": "no files found"}
@@ -440,16 +516,16 @@ def cmd_generate(args: argparse.Namespace) -> int:
     markdown = generator.generate_for_files(files, base_path)
 
     # output results
-    if args.plumbing:
+    if plumbing_mode:
         print(
             json.dumps(
                 {"files": [str(f) for f in files], "markdown": markdown}
             )
         )
-    elif args.output:
-        output_path = Path(args.output)
-        output_path.write_text(markdown, encoding="utf-8")
-        print(f"generated markdown written to {args.output}")
+    elif output_path_str:
+        output_path = Path(output_path_str)
+        _ = output_path.write_text(markdown, encoding="utf-8")
+        print(f"generated markdown written to {output_path_str}")
         print(f"\nprocessed {len(files)} file(s)")
     else:
         print(markdown)
@@ -471,14 +547,18 @@ def cmd_config(args: argparse.Namespace) -> int:
     config = Config.default()
 
     # update from args
-    if args.include:
-        config.include = args.include
-    if args.exclude:
-        config.exclude = args.exclude
+    include_patterns = cast(list[str] | None, args.include)
+    exclude_patterns = cast(list[str] | None, args.exclude)
+    config_type = cast(str | None, args.config_type)
 
-    if args.config_type == "pyproject.toml":
+    if include_patterns:
+        config.include = include_patterns
+    if exclude_patterns:
+        config.exclude = exclude_patterns
+
+    if config_type == "pyproject.toml":
         print(config.to_example_toml("tool.meadoc"))
-    elif args.config_type in ("meadoc.toml", ".meadoc.toml"):
+    elif config_type in ("meadoc.toml", ".meadoc.toml"):
         print(config.to_example_toml("meadoc"))
     else:
         # print general config documentation
@@ -496,7 +576,7 @@ example configuration for each file type.
     return 0
 
 
-def cmd_about(_args: argparse.Namespace) -> int:  # pyright: ignore[reportUnusedParameter]
+def cmd_about(_args: argparse.Namespace) -> int:
     """handle the about command to display format documentation.
 
     arguments:
@@ -557,7 +637,8 @@ def main(args: list[str] | None = None) -> int:
     parser = create_parser()
     parsed_args = parser.parse_args(args)
 
-    if not parsed_args.command:
+    command = cast(str | None, parsed_args.command)
+    if not command:
         parser.print_help()
         return 0
 
@@ -569,7 +650,7 @@ def main(args: list[str] | None = None) -> int:
         "about": cmd_about,
     }
 
-    command_func = commands.get(parsed_args.command)
+    command_func = commands.get(command)
     if command_func:
         return command_func(parsed_args)
 

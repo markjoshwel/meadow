@@ -477,7 +477,7 @@ class Config:
             for key_obj, value_obj in external_links.items():  # pyright: ignore[reportUnknownVariableType]
                 key: object = key_obj  # pyright: ignore[reportUnknownVariableType]
                 value: object = value_obj  # pyright: ignore[reportUnknownVariableType]
-                links_dict[str(key)] = str(value)  # pyright: ignore
+                links_dict[str(cast(object, key))] = str(cast(object, value))
             self.generate.external_links = links_dict
 
     def to_example_toml(self, table_name: str = "meadoc") -> str:
