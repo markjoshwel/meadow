@@ -424,6 +424,10 @@ class MarkdownGenerator:
     def _format_function(self, func: FunctionDoc) -> list[str]:
         """format a function documentation
 
+        for methods/functions sections, only show the function name
+        without the full signature, as the full signature is shown
+        in the actual function documentation
+
         arguments:
             `func: FunctionDoc`
                 function documentation
@@ -432,7 +436,11 @@ class MarkdownGenerator:
             formatted lines
         """
         lines: list[str] = []
-        first_line = f"  - `{func.signature}`"
+
+        # extract just the function name from the signature
+        # signature format: "def name(args) -> return_type"
+        func_name = self._extract_function_name(func.signature)
+        first_line = f"  - `def {func_name}()`"
 
         if func.description:
             first_line += "  "  # two spaces for markdown line break
@@ -443,6 +451,29 @@ class MarkdownGenerator:
             lines.append(first_line)
 
         return lines
+
+    def _extract_function_name(self, signature: str) -> str:
+        """extract the function name from a signature
+
+        arguments:
+            `signature: str`
+                full function signature (e.g., "def foo(arg: int) -> str")
+
+        returns: `str`
+            function name only
+        """
+        # remove 'def ' prefix
+        if signature.startswith("def "):
+            signature = signature[4:]
+        elif signature.startswith("async def "):
+            signature = signature[10:]
+
+        # extract name up to opening parenthesis
+        if "(" in signature:
+            return signature.split("(")[0].strip()
+
+        # fallback: return as-is
+        return signature.strip()
 
     def _format_return(self, ret: ReturnDoc) -> list[str]:
         """format a return documentation

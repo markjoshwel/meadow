@@ -67,16 +67,34 @@ the format is comprised of multiple sections:
 
     ```text
     {functions,methods}:
-        `<python function declaration syntax without trailing colon>`
+        `def function_name()`
             <description of the function>
     ```
 
     example:
 
-    ```text
-    functions:
-        `def bake(self, override: BakingOverride | None = None) -> bool`
-            bakes the cake and returns True if successful
+    ```python
+    class Example:
+        """blah blah blah
+
+        blah blah blah
+
+        methods:
+            `def greeting_string()`
+                returns a greeting string based on a passed in name
+        """
+
+        def greeting_string(self, name: str) -> str:
+            """
+            returns a greeting string based on a passed in name
+
+            arguments:
+                `name: str`
+                    full name to greet
+
+            returns: `str`
+                built greeting string
+            """
     ```
 
 5. **returns** and **raises**
