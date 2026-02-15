@@ -27,6 +27,8 @@ dev = [
     "ruff>=0.6.0",
     "mypy>=1.0.0",
     "raiseattention>=2026.2.141",
+    "requests>=2.32.5",
+    "beautifulsoup4>=4.14.3",
 ]
 
 [tool.pytest.ini_options]
@@ -75,6 +77,7 @@ select = [
     "SIM", # flake8-simplify
 ]
 ignore = [
+    # ruff v. mdf wrangling
     "D100",  # Missing docstring in public module
     "D104",  # Missing docstring in public package
     "D105",  # Missing docstring in magic method
@@ -82,13 +85,15 @@ ignore = [
     "D203",  # 1 blank line required before class docstring
     "D205",  # 1 blank line required between summary line and description
     "D213",  # Multi-line docstring summary should start at the second line
+    "D401",  # First line of docstring should be in imperative mood
+    "D400",  # First line should end with a period
     "D403",  # First word of docstring should be capitalized (lowercase style)
     "D405",  # Section name should be properly capitalized (lowercase style)
+    "D413",  # Missing blank line after last section ("arguments")
     "D415",  # First line should end with a period
     "D417",  # Missing argument descriptions in docstring
-    "E501",  # Line too long
-    "SIM102",  # Use single if instead of nested if
+    
+    # do NOT re-enable these.
+    # "E501",  # Line too long
+    # "SIM102",  # Use single if instead of nested if
 ]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"

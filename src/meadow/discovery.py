@@ -57,5 +57,4 @@ def discover_python_files(
             )
             all_files.update(resolver.resolve())
 
-    for f in sorted(all_files):
-        yield f
+    yield from sorted(all_files)
