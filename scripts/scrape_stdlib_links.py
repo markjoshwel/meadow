@@ -26,12 +26,10 @@ output format:
 
 import argparse
 import sys
-from typing import cast
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-from bs4.element import Tag
 
 BASE_URL = "https://docs.python.org/{version}/library/"
 
@@ -65,8 +63,7 @@ def get_module_list(version: str) -> dict[str, str]:
     modules: dict[str, str] = {}
 
     for link in soup.find_all("a", class_="reference internal"):
-        tag = cast(Tag, link)
-        href_attr = tag.get("href")
+        href_attr = link.get("href")
 
         # ensure we have a string, not AttributeValueList or None
         if not isinstance(href_attr, str):
@@ -116,7 +113,7 @@ def scrape_module_types(module_name: str, module_url: str) -> dict[str, str]:
     # look for section headers with function/class definitions
     # python docs use dt elements with ids for definitions
     for dt in soup.find_all("dt"):
-        dt_tag = cast(Tag, dt)
+        dt_tag = dt
         anchor_id_attr = dt_tag.get("id")
 
         # ensure we have a string id
@@ -219,9 +216,9 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    version: str = args.version
-    output: str | None = args.output
-    modules_only: bool = args.modules_only
+    version: str = args.version  # pyright: ignore[reportAny]
+    output: str | None = args.output  # pyright: ignore[reportAny]
+    modules_only: bool = args.modules_only  # pyright: ignore[reportAny]
 
     print(f"scraping python {version} documentation...", file=sys.stderr)
 

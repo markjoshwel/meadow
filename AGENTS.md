@@ -14,19 +14,19 @@ This is meadow: a docstring machine based on typing information for the meadow D
 
 ```bash
 # strict static analysis + type check
-uv run basedpyright src scripts
+uv run basedpyright
 
 # general linting
-uv run ruff check .
+uv run ruff check
 
 # type safety
-uv run mypy .
+uv run mypy
 
 # exception safety
-uv run raiseattention check src
+uv run raiseattention check
 
 # MDF compliance (self-check)
-uv run meadoc check src
+uv run meadoc
 ```
 
 ## Code Standards

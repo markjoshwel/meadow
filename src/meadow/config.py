@@ -151,8 +151,9 @@ def _get_table(table: Table | TOMLDocument, key: str) -> Table | None:
         the table value if present and valid, None otherwise
     """
     value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-    if isinstance(value, Table):
-        return value
+    # handle both Table and OutOfOrderTableProxy (which can appear in pyproject.toml)
+    if isinstance(value, (Table, dict)):
+        return cast(Table, value)
     return None
 
 
@@ -184,9 +185,7 @@ class FormatConfig:
     indent_width: int = 4
     indent_style: Literal["space", "tab"] = "space"
     code_block_format: bool = True
-    code_block_format_command: list[str] = field(
-        default_factory=lambda: ["ruff", "format", "-"]
-    )
+    code_block_format_command: list[str] = field(default_factory=lambda: ["ruff", "format", "-"])
     multi_line_summary_on_line: Literal[1, 2] = 2
 
 
@@ -378,9 +377,7 @@ class Config:
 
         summary_value = _get_int(config_table, "multi-line-summary-on-line")
         if summary_value is not None and summary_value in SUMMARY_LINE_OPTIONS:
-            self.multi_line_summary_on_line = cast(
-                Literal[1, 2], summary_value
-            )
+            self.multi_line_summary_on_line = cast(Literal[1, 2], summary_value)
 
         module_docstrings = _get_bool(config_table, "module-docstrings")
         if module_docstrings is not None:
@@ -420,9 +417,7 @@ class Config:
 
         indent_style = _get_str(table, "indent-style")
         if indent_style is not None and indent_style in INDENT_STYLE_OPTIONS:
-            self.format.indent_style = cast(
-                Literal["space", "tab"], indent_style
-            )
+            self.format.indent_style = cast(Literal["space", "tab"], indent_style)
 
         code_block_format = _get_bool(table, "code-block-format")
         if code_block_format is not None:
@@ -430,15 +425,11 @@ class Config:
 
         code_block_command = _get_list(table, "code-block-format-command")
         if code_block_command:
-            self.format.code_block_format_command = [
-                str(item) for item in code_block_command
-            ]
+            self.format.code_block_format_command = [str(item) for item in code_block_command]
 
         summary_line = _get_int(table, "multi-line-summary-on-line")
         if summary_line is not None and summary_line in SUMMARY_LINE_OPTIONS:
-            self.format.multi_line_summary_on_line = cast(
-                Literal[1, 2], summary_line
-            )
+            self.format.multi_line_summary_on_line = cast(Literal[1, 2], summary_line)
 
     def _load_generate_config(self, table: Table) -> None:
         """load generate configuration from a toml table
@@ -468,9 +459,7 @@ class Config:
 
         indent_style = _get_str(table, "indent-style")
         if indent_style is not None and indent_style in INDENT_STYLE_OPTIONS:
-            self.generate.indent_style = cast(
-                Literal["space", "tab"], indent_style
-            )
+            self.generate.indent_style = cast(Literal["space", "tab"], indent_style)
 
         external_links = _get_table(table, "external-links")
         if external_links:

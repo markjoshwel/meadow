@@ -44,7 +44,6 @@ include = ["src", "stubs", "scripts"]
 exclude = [
     "**/__pycache__",
     ".venv",
-    "venv",
     "docs/ide_rendering_tests",
 ]
 pythonVersion = "3.13"
@@ -56,8 +55,14 @@ reportUnknownVariableType = false
 reportArgumentType = false
 
 [tool.ruff]
+include = ["src/**/*.py", "stubs/**/*.py", "scripts/**/*.py"]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "docs/ide_rendering_tests",
+]
 target-version = "py313"
-line-length = 79
+line-length = 100
 indent-width = 4
 
 [tool.ruff.format]
@@ -99,4 +104,28 @@ ignore = [
     # do NOT re-enable these
     # "E501",  # Line too long
     # "SIM102",  # Use single if instead of nested if
+]
+
+[tool.mypy]
+files = ["src", "stubs", "scripts"]
+exclude = [
+    "__pycache__",
+    ".venv",
+    "docs/ide_rendering_tests",
+]
+
+[tool.raiseattention]
+include = ["src/**/*.py", "stubs/**/*.py", "scripts/**/*.py"]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "docs/ide_rendering_tests",
+]
+
+[tool.meadoc]
+include = ["src/**/*.py", "stubs/**/*.py", "scripts/**/*.py"]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "docs/ide_rendering_tests",
 ]
