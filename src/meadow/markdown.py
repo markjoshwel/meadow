@@ -9,7 +9,7 @@ this module generates markdown API reference documentation from MDF docstrings.
 import ast
 import sys
 from pathlib import Path
-from typing import NewType, cast
+from typing import NewType
 
 import tomlkit
 
@@ -984,20 +984,17 @@ class MarkdownGenerator:
             try:
                 content = config_path.read_text(encoding="utf-8")
                 parsed_doc = tomlkit.parse(content)
-                if parsed_doc is not None:  # type: ignore
-                    # get existing external links
-                    meadoc_table = parsed_doc.get("meadoc")
-                    if isinstance(meadoc_table, dict):
-                        generate_table = meadoc_table.get("generate")
-                        if isinstance(generate_table, dict):
-                            links_table = generate_table.get("external-links")
-                            if isinstance(links_table, dict):
-                                for k_obj, v_obj in links_table.items():  # type: ignore
-                                    existing_links[
-                                        str(cast(object, k_obj))
-                                    ] = str(cast(object, v_obj))
-                        # Re-use the parsed document structure
-                        doc = parsed_doc
+                # get existing external links
+                meadoc_table = parsed_doc.get("meadoc")
+                if isinstance(meadoc_table, dict):
+                    generate_table = meadoc_table.get("generate")
+                    if isinstance(generate_table, dict):
+                        links_table = generate_table.get("external-links")
+                        if isinstance(links_table, dict):
+                            for key, value in links_table.items():
+                                existing_links[str(key)] = str(value)
+                # Re-use the parsed document structure
+                doc = parsed_doc
             except Exception:
                 pass
 

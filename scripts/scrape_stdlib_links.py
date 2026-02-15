@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """scrape python docs for standard library external links.
 
+with all my heart, 2026, mark joshwel <mark@joshwel.co>
+SPDX-License-Identifier: Unlicense OR 0BSD
+
 this script scrapes docs.python.org to build a mapping of standard library
 modules and their types to their documentation URLs. the output can be used
 to populate meadow's external links configuration.
@@ -21,40 +24,38 @@ output format:
     }
 """
 
-from __future__ import annotations
-
 import argparse
-import re
 import sys
+from typing import cast
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-
+from bs4.element import Tag
 
 BASE_URL = "https://docs.python.org/{version}/library/"
 
 # modules to skip (internal, deprecated, or not relevant)
-SKIP_MODULES = {
-    "__future__",
-    "__main__",
-    "__builtin__",
-    "builtins",  # handled specially
-    "test",
-    "tests",
-    "idlelib",  # IDLE implementation details
-}
+SKIP_MODULES: frozenset[str] = frozenset(
+    [
+        "__future__",
+        "__main__",
+        "__builtin__",
+        "builtins",
+        "test",
+        "tests",
+        "idlelib",
+    ]
+)
 
 
 def get_module_list(version: str) -> dict[str, str]:
     """get list of standard library modules from the library index.
 
     arguments:
-        `version: str`
-            python version (e.g., "3.13")
+        version: python version (e.g., "3.13")
 
-    returns: `dict[str, str]`
-        mapping of module name to documentation URL
+    returns: mapping of module name to documentation URL
     """
     url = BASE_URL.format(version=version)
     response = requests.get(url, timeout=30)
@@ -63,43 +64,44 @@ def get_module_list(version: str) -> dict[str, str]:
     soup = BeautifulSoup(response.text, "html.parser")
     modules: dict[str, str] = {}
 
-    # find the toctree with module links
-    # the library index has sections with links to module pages
     for link in soup.find_all("a", class_="reference internal"):
-        href = link.get("href", "")
+        tag = cast(Tag, link)
+        href_attr = tag.get("href")
+
+        # ensure we have a string, not AttributeValueList or None
+        if not isinstance(href_attr, str):
+            continue
+
+        href = href_attr
+
         # module links look like "module_name.html" or "module.name.html"
-        if href.endswith(".html") and not href.startswith(
-            ("http", "#", "../")
+        if not href.endswith(".html"):
+            continue
+        if href.startswith(("http", "#", "../")):
+            continue
+
+        module_name = href.replace(".html", "").split("#")[0]
+
+        # skip internal/deprecated modules
+        if module_name in SKIP_MODULES or module_name.startswith(
+            ("test.", "_")
         ):
-            module_name = href.replace(".html", "").split("#")[0]
+            continue
 
-            # skip internal/deprecated modules
-            if module_name in SKIP_MODULES or module_name.startswith(
-                ("test.", "_")
-            ):
-                continue
-
-            full_url = urljoin(url, href)
-            modules[module_name] = full_url
+        full_url = urljoin(url, href)
+        modules[module_name] = full_url
 
     return modules
 
 
-def scrape_module_types(
-    module_name: str, module_url: str, version: str
-) -> dict[str, str]:
+def scrape_module_types(module_name: str, module_url: str) -> dict[str, str]:
     """scrape a module page for classes, functions, and exceptions.
 
     arguments:
-        `module_name: str`
-            name of the module
-        `module_url: str`
-            URL to the module documentation
-        `version: str`
-            python version
+        module_name: name of the module
+        module_url: URL to the module documentation
 
-    returns: `dict[str, str]`
-        mapping of fully qualified name to anchor URL
+    returns: mapping of fully qualified name to anchor URL
     """
     links: dict[str, str] = {}
 
@@ -114,20 +116,36 @@ def scrape_module_types(
     # look for section headers with function/class definitions
     # python docs use dt elements with ids for definitions
     for dt in soup.find_all("dt"):
-        # get the id which contains the anchor
-        anchor_id = dt.get("id", "")
+        dt_tag = cast(Tag, dt)
+        anchor_id_attr = dt_tag.get("id")
+
+        # ensure we have a string id
+        if not isinstance(anchor_id_attr, str):
+            continue
+
+        anchor_id = anchor_id_attr
         if not anchor_id:
             continue
 
         # check if this looks like a class/function definition
         # format is usually "module.ClassName" or "module.function_name"
-        if anchor_id.startswith(module_name + "."):
-            # clean up the id - sometimes has extra info
-            clean_id = anchor_id.split(".")[-1].split("-")[0]
-            if clean_id and not clean_id.startswith(("_", "test_")):
-                full_name = f"{module_name}.{clean_id}"
-                anchor_url = f"{module_url}#{anchor_id}"
-                links[full_name] = anchor_url
+        if not anchor_id.startswith(module_name + "."):
+            continue
+
+        # clean up the id - sometimes has extra info
+        parts = anchor_id.split(".")
+        if len(parts) < 2:
+            continue
+
+        clean_id = parts[-1].split("-")[0]
+        if not clean_id:
+            continue
+        if clean_id.startswith("_") or clean_id.startswith("test_"):
+            continue
+
+        full_name = f"{module_name}.{clean_id}"
+        anchor_url = f"{module_url}#{anchor_id}"
+        links[full_name] = anchor_url
 
     return links
 
@@ -136,20 +154,16 @@ def generate_links_code(links: dict[str, str]) -> str:
     """generate python code with the links dictionary.
 
     arguments:
-        `links: dict[str, str]`
-            mapping of names to URLs
+        links: mapping of names to URLs
 
-    returns: `str`
-        formatted python code
+    returns: formatted python code
     """
-    lines = [
+    lines: list[str] = [
         '"""standard library external links for meadow.',
         "",
         "this module contains documentation URLs for standard library modules,",
         "classes, and functions. auto-generated by scripts/scrape_stdlib_links.py.",
         '"""',
-        "",
-        "from __future__ import annotations",
         "",
         "# fmt: off",
         "STDLIB_LINKS: dict[str, str] = {",
@@ -170,11 +184,9 @@ def generate_links_code(links: dict[str, str]) -> str:
             '    """get documentation URL for a standard library name.',
             "",
             "    arguments:",
-            "        `name: str`",
-            '            fully qualified name (e.g., "pathlib.Path")',
+            "        name: fully qualified name (e.g., 'pathlib.Path')",
             "",
-            "    returns: `str | None`",
-            "        documentation URL or None if not found",
+            "    returns: documentation URL or None if not found",
             '    """',
             "    return STDLIB_LINKS.get(name)",
             "",
@@ -189,17 +201,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="scrape python docs for standard library links",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--version",
         default="3.13",
         help="python version to scrape (default: 3.13)",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-o",
         "--output",
         help="output file (default: stdout)",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--modules-only",
         action="store_true",
         help="only scrape module-level links, not individual classes/functions",
@@ -207,10 +219,14 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    print(f"scraping python {args.version} documentation...", file=sys.stderr)
+    version: str = args.version
+    output: str | None = args.output
+    modules_only: bool = args.modules_only
+
+    print(f"scraping python {version} documentation...", file=sys.stderr)
 
     # get module list
-    modules = get_module_list(args.version)
+    modules = get_module_list(version)
     print(f"found {len(modules)} modules", file=sys.stderr)
 
     all_links: dict[str, str] = {}
@@ -219,9 +235,9 @@ def main() -> int:
     for module_name, module_url in modules.items():
         all_links[module_name] = module_url
 
-        if not args.modules_only:
+        if not modules_only:
             # scrape individual types from module pages
-            types = scrape_module_types(module_name, module_url, args.version)
+            types = scrape_module_types(module_name, module_url)
             all_links.update(types)
 
     print(f"total links: {len(all_links)}", file=sys.stderr)
@@ -229,10 +245,10 @@ def main() -> int:
     # generate output
     code = generate_links_code(all_links)
 
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write(code)
-        print(f"written to {args.output}", file=sys.stderr)
+    if output:
+        with open(output, "w", encoding="utf-8") as f:
+            _ = f.write(code)
+        print(f"written to {output}", file=sys.stderr)
     else:
         print(code)
 

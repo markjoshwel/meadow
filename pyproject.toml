@@ -29,6 +29,7 @@ dev = [
     "raiseattention>=2026.2.141",
     "requests>=2.32.5",
     "ruff>=0.15.1",
+    "types-requests>=2.32.4.20260107",
 ]
 
 [tool.pytest.ini_options]
