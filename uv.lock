@@ -157,7 +157,7 @@ wheels = [
 
 [[package]]
 name = "meadow"
-version = "2026.1.21"
+version = "2026.2.15"
 source = { editable = "." }
 dependencies = [
     { name = "tomlkit" },
