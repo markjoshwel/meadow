@@ -51,9 +51,11 @@ def get_module_list(version: str) -> dict[str, str]:
     """get list of standard library modules from the library index.
 
     arguments:
-        version: python version (e.g., "3.13")
+        `version: str`
+            python version (e.g., "3.13")
 
-    returns: mapping of module name to documentation URL
+    returns: `dict[str, str]`
+        mapping of module name to documentation URL
     """
     url = BASE_URL.format(version=version)
     response = requests.get(url, timeout=30)
@@ -80,9 +82,7 @@ def get_module_list(version: str) -> dict[str, str]:
         module_name = href.replace(".html", "").split("#")[0]
 
         # skip internal/deprecated modules
-        if module_name in SKIP_MODULES or module_name.startswith(
-            ("test.", "_")
-        ):
+        if module_name in SKIP_MODULES or module_name.startswith(("test.", "_")):
             continue
 
         full_url = urljoin(url, href)
@@ -95,10 +95,13 @@ def scrape_module_types(module_name: str, module_url: str) -> dict[str, str]:
     """scrape a module page for classes, functions, and exceptions.
 
     arguments:
-        module_name: name of the module
-        module_url: URL to the module documentation
+        `module_name: str`
+            name of the module
+        `module_url: str`
+            URL to the module documentation
 
-    returns: mapping of fully qualified name to anchor URL
+    returns: `dict[str, str]`
+        mapping of fully qualified name to anchor URL
     """
     links: dict[str, str] = {}
 
@@ -151,9 +154,11 @@ def generate_links_code(links: dict[str, str]) -> str:
     """generate python code with the links dictionary.
 
     arguments:
-        links: mapping of names to URLs
+        `links: dict[str, str]`
+            mapping of names to URLs
 
-    returns: formatted python code
+    returns: `str`
+        formatted python code
     """
     lines: list[str] = [
         '"""standard library external links for meadow.',
@@ -194,7 +199,11 @@ def generate_links_code(links: dict[str, str]) -> str:
 
 
 def main() -> int:
-    """main entry point."""
+    """main entry point
+
+    returns: `int`
+        exit code (0 for success)
+    """
     parser = argparse.ArgumentParser(
         description="scrape python docs for standard library links",
     )

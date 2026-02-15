@@ -6,7 +6,6 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 this module generates MDF-compliant docstrings from Python code elements.
 """
 
-
 from pathlib import Path
 from typing import TypedDict
 
@@ -115,9 +114,7 @@ class DocstringBuilder:
 
         return self._format_docstring(result_lines)
 
-    def _extract_existing_content(
-        self, docstring: str
-    ) -> tuple[str, list[str]]:
+    def _extract_existing_content(self, docstring: str) -> tuple[str, list[str]]:
         """extract preamble and body from existing docstring
 
         arguments:
@@ -216,9 +213,7 @@ class DocstringBuilder:
         arg_lines: list[str] = []
 
         # choose section name
-        section_name = (
-            "attributes:" if element.element_type == "class" else "arguments:"
-        )
+        section_name = "attributes:" if element.element_type == "class" else "arguments:"
         arg_lines.append(section_name)
 
         # generate entries
@@ -270,9 +265,8 @@ class DocstringBuilder:
         """
         content = "\n".join(lines)
 
-        if self.config.multi_line_summary_on_line == 2:
-            if not content.startswith("\n"):
-                content = "\n" + content
+        if self.config.multi_line_summary_on_line == 2 and not content.startswith("\n"):
+            content = "\n" + content
 
         return content
 
@@ -315,9 +309,7 @@ class DocstringUpdater:
         self.config = config
         self.builder = DocstringBuilder(config.format)
 
-    def update_file(
-        self, file_path: Path, fix_malformed: bool = False
-    ) -> UpdateResult:
+    def update_file(self, file_path: Path, fix_malformed: bool = False) -> UpdateResult:
         """update docstrings in a file
 
         arguments:

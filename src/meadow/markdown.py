@@ -8,6 +8,7 @@ this module generates markdown API reference documentation from MDF docstrings.
 
 import ast
 import sys
+from contextlib import suppress
 from pathlib import Path
 from typing import NewType
 
@@ -191,9 +192,7 @@ class MarkdownGenerator:
         """
         self.config = config or GenerateConfig()
 
-    def generate_for_file(
-        self, file_path: Path, _base_path: Path | None = None
-    ) -> Markdown:
+    def generate_for_file(self, file_path: Path, _base_path: Path | None = None) -> Markdown:
         """generate markdown documentation for a python file
 
         arguments:
@@ -266,9 +265,7 @@ class MarkdownGenerator:
             if file_md and file_md.strip():
                 file_outputs.append((module_name, str(file_md)))
                 # add TOC entry
-                anchor = (
-                    module_name.lower().replace(".", "-").replace(" ", "-")
-                )
+                anchor = module_name.lower().replace(".", "-").replace(" ", "-")
                 toc_entries.append(f"- [{module_name}](#{anchor})")
 
         # if no files had content, return empty
@@ -568,9 +565,7 @@ class MarkdownGenerator:
         else:
             # no link: `name: type`
             if param.default_value:
-                first_line = (
-                    f"  - `{param.name}: {type_str} = {param.default_value}`"
-                )
+                first_line = f"  - `{param.name}: {type_str} = {param.default_value}`"
             else:
                 first_line = f"  - `{param.name}: {type_str}`"
 
@@ -670,10 +665,7 @@ class MarkdownGenerator:
                 if module_prefix in STDLIB_LINKS:
                     link_url = STDLIB_LINKS[module_prefix]
 
-        if link_url:
-            first_line = f"  - [`{type_str}`]({link_url})"
-        else:
-            first_line = f"  - `{type_str}`"
+        first_line = f"  - [`{type_str}`]({link_url})" if link_url else f"  - `{type_str}`"
 
         if ret.description:
             first_line += "  "
@@ -785,27 +777,21 @@ class MarkdownGenerator:
                     SectionType.ATTRIBUTES,
                 ):
                     section = parsed.get_section(section_type)
-                    if section:
-                        for item in section.items:
-                            if isinstance(item, ParameterDoc):
-                                if item.type_annotation:
-                                    types = (
-                                        self._extract_types_from_annotation(
-                                            item.type_annotation
-                                        )
-                                    )
-                                    external_types.update(types)
+                    if not section:
+                        continue
+                    for item in section.items:
+                        if isinstance(item, ParameterDoc) and item.type_annotation:
+                            types = self._extract_types_from_annotation(item.type_annotation)
+                            external_types.update(types)
 
                 # collect types from returns
                 returns_section = parsed.get_section(SectionType.RETURNS)
-                if returns_section:
-                    for item in returns_section.items:
-                        if isinstance(item, ReturnDoc):
-                            if item.type_annotation:
-                                types = self._extract_types_from_annotation(
-                                    item.type_annotation
-                                )
-                                external_types.update(types)
+                if not returns_section:
+                    continue
+                for item in returns_section.items:
+                    if isinstance(item, ReturnDoc) and item.type_annotation:
+                        types = self._extract_types_from_annotation(item.type_annotation)
+                        external_types.update(types)
 
                 # collect types from raises
                 raises_section = parsed.get_section(SectionType.RAISES)
@@ -817,13 +803,9 @@ class MarkdownGenerator:
                                 external_types.add(item.exception_class)
                             else:
                                 # check if it's a stdlib exception
-                                module = self._guess_exception_module(
-                                    item.exception_class
-                                )
+                                module = self._guess_exception_module(item.exception_class)
                                 if module:
-                                    external_types.add(
-                                        f"{module}.{item.exception_class}"
-                                    )
+                                    external_types.add(f"{module}.{item.exception_class}")
 
         return external_types
 
@@ -1023,7 +1005,5 @@ class MarkdownGenerator:
             links_table[type_name] = ""  # type: ignore
 
         # write back to file
-        try:
+        with suppress(Exception):
             _ = config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-        except Exception:
-            pass  # silently fail if can't write

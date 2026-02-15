@@ -248,14 +248,18 @@ class ErrorCode(Enum):
         """
         descriptions: dict[ErrorCode, str] = {
             ErrorCode.MISSING_DOCSTRING: "missing docstring",
-            ErrorCode.NOT_AN_MDF_DOCSTRING: "docstring is not in meadow Docstring Format",
-            ErrorCode.OTHER_FORMAT_DOCSTRING: "docstring appears to be in another format (sphinx/google)",
-            ErrorCode.MALFORMED_MDF_DOCSTRING: "malformed meadow Docstring Format docstring",
+            ErrorCode.NOT_AN_MDF_DOCSTRING: ("docstring is not in meadow Docstring Format"),
+            ErrorCode.OTHER_FORMAT_DOCSTRING: ("docstring appears to be in another format"),
+            ErrorCode.MALFORMED_MDF_DOCSTRING: ("malformed meadow Docstring Format docstring"),
             ErrorCode.MISSING_PREAMBLE: "missing preamble section",
-            ErrorCode.INVALID_CLASS_DECLARATION: "invalid class declaration syntax",
-            ErrorCode.INVALID_CLASS_ATTRIBUTE_DECLARATION: "invalid class attribute declaration syntax",
-            ErrorCode.INVALID_FUNCTION_DECLARATION: "invalid function declaration syntax",
-            ErrorCode.INVALID_FUNCTION_ARGUMENT_DECLARATION: "invalid function argument declaration syntax",
+            ErrorCode.INVALID_CLASS_DECLARATION: ("invalid class declaration syntax"),
+            ErrorCode.INVALID_CLASS_ATTRIBUTE_DECLARATION: (
+                "invalid class attribute declaration syntax"
+            ),
+            ErrorCode.INVALID_FUNCTION_DECLARATION: ("invalid function declaration syntax"),
+            ErrorCode.INVALID_FUNCTION_ARGUMENT_DECLARATION: (
+                "invalid function argument declaration syntax"
+            ),
             ErrorCode.INVALID_VARIABLE_DECLARATION: "invalid variable declaration syntax",
             ErrorCode.INVALID_RETURN_TYPE_ANNOTATION: "invalid return type annotation",
             ErrorCode.UNKNOWN_RAISES_CLASS: "unknown exception class in raises section",
@@ -264,37 +268,59 @@ class ErrorCode(Enum):
             ErrorCode.MISSING_SECTION_COLON: "missing colon after section name",
             ErrorCode.INVALID_INDENTATION: "invalid indentation",
             ErrorCode.SECTIONS_OUT_OF_ORDER: "sections are not in the correct order",
-            ErrorCode.MULTI_LINE_SUMMARY_FIRST_LINE: "multi-line summary should start on first line",
-            ErrorCode.MULTI_LINE_SUMMARY_SECOND_LINE: "multi-line summary should start on second line",
-            ErrorCode.INCOMPLETE_MDF_DOCSTRING: "incomplete meadow Docstring Format docstring",
+            ErrorCode.MULTI_LINE_SUMMARY_FIRST_LINE: (
+                "multi-line summary should start on first line"
+            ),
+            ErrorCode.MULTI_LINE_SUMMARY_SECOND_LINE: (
+                "multi-line summary should start on second line"
+            ),
+            ErrorCode.INCOMPLETE_MDF_DOCSTRING: ("incomplete meadow Docstring Format docstring"),
             ErrorCode.DUPLICATE_CLASS_DECLARATION: "duplicate class declaration",
-            ErrorCode.DUPLICATE_CLASS_ATTRIBUTE_DECLARATION: "duplicate class attribute declaration",
-            ErrorCode.DUPLICATE_FUNCTION_DECLARATION: "duplicate function declaration",
-            ErrorCode.DUPLICATE_FUNCTION_ARGUMENT_DECLARATION: "duplicate function argument declaration",
-            ErrorCode.DUPLICATE_VARIABLE_DECLARATION: "duplicate variable declaration",
-            ErrorCode.DUPLICATE_RETURN_TYPE_ANNOTATION: "duplicate return type annotation",
+            ErrorCode.DUPLICATE_CLASS_ATTRIBUTE_DECLARATION: (
+                "duplicate class attribute declaration"
+            ),
+            ErrorCode.DUPLICATE_FUNCTION_DECLARATION: ("duplicate function declaration"),
+            ErrorCode.DUPLICATE_FUNCTION_ARGUMENT_DECLARATION: (
+                "duplicate function argument declaration"
+            ),
+            ErrorCode.DUPLICATE_VARIABLE_DECLARATION: ("duplicate variable declaration"),
+            ErrorCode.DUPLICATE_RETURN_TYPE_ANNOTATION: ("duplicate return type annotation"),
             ErrorCode.DUPLICATE_RAISES_CLASS: "duplicate raises class",
-            ErrorCode.OUTDATED_MDF_DOCSTRING: "outdated meadow Docstring Format docstring",
+            ErrorCode.OUTDATED_MDF_DOCSTRING: ("outdated meadow Docstring Format docstring"),
             ErrorCode.OUTDATED_CLASS_DECLARATION: "outdated class declaration",
-            ErrorCode.OUTDATED_CLASS_ATTRIBUTE_DECLARATION: "outdated class attribute declaration",
-            ErrorCode.OUTDATED_FUNCTION_DECLARATION: "outdated function declaration",
-            ErrorCode.OUTDATED_FUNCTION_ARGUMENT_DECLARATION: "outdated function argument declaration",
-            ErrorCode.OUTDATED_VARIABLE_DECLARATION: "outdated variable declaration",
-            ErrorCode.OUTDATED_RETURN_TYPE_ANNOTATION: "outdated return type annotation",
+            ErrorCode.OUTDATED_CLASS_ATTRIBUTE_DECLARATION: (
+                "outdated class attribute declaration"
+            ),
+            ErrorCode.OUTDATED_FUNCTION_DECLARATION: ("outdated function declaration"),
+            ErrorCode.OUTDATED_FUNCTION_ARGUMENT_DECLARATION: (
+                "outdated function argument declaration"
+            ),
+            ErrorCode.OUTDATED_VARIABLE_DECLARATION: ("outdated variable declaration"),
+            ErrorCode.OUTDATED_RETURN_TYPE_ANNOTATION: ("outdated return type annotation"),
             ErrorCode.OUTDATED_RAISES_CLASS: "outdated raises class",
-            ErrorCode.EXTRA_CLASS_DECLARATION: "extra class declaration in docstring",
-            ErrorCode.EXTRA_CLASS_ATTRIBUTE_DECLARATION: "extra class attribute declaration in docstring",
-            ErrorCode.EXTRA_FUNCTION_DECLARATION: "extra function declaration in docstring",
-            ErrorCode.EXTRA_FUNCTION_ARGUMENT_DECLARATION: "extra function argument declaration in docstring",
-            ErrorCode.EXTRA_VARIABLE_DECLARATION: "extra variable declaration in docstring",
-            ErrorCode.EXTRA_RETURN_TYPE_ANNOTATION: "extra return type annotation in docstring",
+            ErrorCode.EXTRA_CLASS_DECLARATION: ("extra class declaration in docstring"),
+            ErrorCode.EXTRA_CLASS_ATTRIBUTE_DECLARATION: (
+                "extra class attribute declaration in docstring"
+            ),
+            ErrorCode.EXTRA_FUNCTION_DECLARATION: ("extra function declaration in docstring"),
+            ErrorCode.EXTRA_FUNCTION_ARGUMENT_DECLARATION: (
+                "extra function argument declaration in docstring"
+            ),
+            ErrorCode.EXTRA_VARIABLE_DECLARATION: ("extra variable declaration in docstring"),
+            ErrorCode.EXTRA_RETURN_TYPE_ANNOTATION: ("extra return type annotation in docstring"),
             ErrorCode.EXTRA_RAISES_CLASS: "extra raises class in docstring",
-            ErrorCode.MISSING_CLASS_DECLARATION: "missing class declaration in docstring",
-            ErrorCode.MISSING_CLASS_ATTRIBUTE_DECLARATION: "missing class attribute declaration in docstring",
-            ErrorCode.MISSING_FUNCTION_DECLARATION: "missing function declaration in docstring",
-            ErrorCode.MISSING_FUNCTION_ARGUMENT_DECLARATION: "missing function argument declaration in docstring",
-            ErrorCode.MISSING_VARIABLE_DECLARATION: "missing variable declaration in docstring",
-            ErrorCode.MISSING_RETURN_TYPE_ANNOTATION: "missing return type annotation in docstring",
+            ErrorCode.MISSING_CLASS_DECLARATION: ("missing class declaration in docstring"),
+            ErrorCode.MISSING_CLASS_ATTRIBUTE_DECLARATION: (
+                "missing class attribute declaration in docstring"
+            ),
+            ErrorCode.MISSING_FUNCTION_DECLARATION: ("missing function declaration in docstring"),
+            ErrorCode.MISSING_FUNCTION_ARGUMENT_DECLARATION: (
+                "missing function argument declaration in docstring"
+            ),
+            ErrorCode.MISSING_VARIABLE_DECLARATION: ("missing variable declaration in docstring"),
+            ErrorCode.MISSING_RETURN_TYPE_ANNOTATION: (
+                "missing return type annotation in docstring"
+            ),
             ErrorCode.MISSING_RAISES_CLASS: "missing raises class in docstring",
             ErrorCode.MISSING_PREAMBLE_SECTION: "missing preamble section",
             ErrorCode.MISSING_INCOMING_SECTION: "missing incoming signatures section",
@@ -472,9 +498,7 @@ class DiagnosticCollection:
         returns: `bool`
             True if any diagnostic has WARNING severity
         """
-        return any(
-            d.severity == ErrorSeverity.WARNING for d in self.diagnostics
-        )
+        return any(d.severity == ErrorSeverity.WARNING for d in self.diagnostics)
 
     def get_by_severity(self, severity: ErrorSeverity) -> list[Diagnostic]:
         """get all diagnostics of a specific severity.

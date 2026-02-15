@@ -7,7 +7,6 @@ this module provides validation of MDF docstrings against actual Python code,
 detecting issues like outdated information, missing sections, and malformed syntax.
 """
 
-
 import ast
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,9 +45,7 @@ class CodeElement:
     element_type: str
     docstring: str | None = None
     line_number: int = 0
-    arguments: list[tuple[str, str | None, str | None]] = field(
-        default_factory=list
-    )
+    arguments: list[tuple[str, str | None, str | None]] = field(default_factory=list)
     return_annotation: str | None = None
     attributes: list[tuple[str, str | None]] = field(default_factory=list)
     raises: list[str] = field(default_factory=list)
@@ -135,9 +132,7 @@ def analyse_file(file_path: Path) -> list[CodeElement] | None:
     return elements
 
 
-def _analyse_class(
-    node: ast.ClassDef, source_lines: list[str]
-) -> list[CodeElement]:
+def _analyse_class(node: ast.ClassDef, source_lines: list[str]) -> list[CodeElement]:
     """analyse a class definition and extract code elements.
 
     arguments:
@@ -157,12 +152,8 @@ def _analyse_class(
     if class_doc and node.body:
         # find end of docstring (docstring is first element in body)
         first_item = node.body[0]
-        if isinstance(first_item, ast.Expr) and isinstance(
-            first_item.value, ast.Constant
-        ):
-            class_ignore = _has_ignore_comment(
-                source_lines, first_item.end_lineno or node.lineno
-            )
+        if isinstance(first_item, ast.Expr) and isinstance(first_item.value, ast.Constant):
+            class_ignore = _has_ignore_comment(source_lines, first_item.end_lineno or node.lineno)
 
     # extract attributes from __init__ or class body
     attributes: list[tuple[str, str | None]] = []
@@ -172,14 +163,10 @@ def _analyse_class(
         if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
             if item.name == "__init__":
                 attributes.extend(_extract_init_attributes(item))
-            method = _analyse_function(
-                item, class_name=node.name, source_lines=source_lines
-            )
+            method = _analyse_function(item, class_name=node.name, source_lines=source_lines)
             methods.append(method)
         elif isinstance(item, ast.AnnAssign):
-            attr_name = (
-                item.target.id if isinstance(item.target, ast.Name) else ""
-            )
+            attr_name = item.target.id if isinstance(item.target, ast.Name) else ""
             type_ann = _annotation_to_str(item.annotation)
             if attr_name:
                 attributes.append((attr_name, type_ann))
@@ -223,12 +210,8 @@ def _analyse_function(
     if func_doc and source_lines and node.body:
         # find end of docstring (docstring is first element in body)
         first_item = node.body[0]
-        if isinstance(first_item, ast.Expr) and isinstance(
-            first_item.value, ast.Constant
-        ):
-            func_ignore = _has_ignore_comment(
-                source_lines, first_item.end_lineno or node.lineno
-            )
+        if isinstance(first_item, ast.Expr) and isinstance(first_item.value, ast.Constant):
+            func_ignore = _has_ignore_comment(source_lines, first_item.end_lineno or node.lineno)
 
     # extract arguments
     arguments: list[tuple[str, str | None, str | None]] = []
@@ -236,10 +219,7 @@ def _analyse_function(
     # self/cls for methods
     if class_name and node.args.args:
         first_arg = node.args.args[0].arg
-        if first_arg in ("self", "cls"):
-            args_to_process = node.args.args[1:]
-        else:
-            args_to_process = node.args.args
+        args_to_process = node.args.args[1:] if first_arg in ("self", "cls") else node.args.args
     else:
         args_to_process = node.args.args
 
@@ -304,16 +284,20 @@ def _extract_init_attributes(
     for stmt in node.body:
         if isinstance(stmt, ast.Assign):
             for target in stmt.targets:
-                if isinstance(target, ast.Attribute):
-                    if isinstance(target.value, ast.Name):
-                        if target.value.id == "self":
-                            attributes.append((target.attr, None))
-        elif isinstance(stmt, ast.AnnAssign):
-            if isinstance(stmt.target, ast.Attribute):
-                if isinstance(stmt.target.value, ast.Name):
-                    if stmt.target.value.id == "self":
-                        type_ann = _annotation_to_str(stmt.annotation)
-                        attributes.append((stmt.target.attr, type_ann))
+                if (
+                    isinstance(target, ast.Attribute)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "self"
+                ):
+                    attributes.append((target.attr, None))
+        elif (
+            isinstance(stmt, ast.AnnAssign)
+            and isinstance(stmt.target, ast.Attribute)
+            and isinstance(stmt.target.value, ast.Name)
+            and stmt.target.value.id == "self"
+        ):
+            type_ann = _annotation_to_str(stmt.annotation)
+            attributes.append((stmt.target.attr, type_ann))
 
     return attributes
 
@@ -460,9 +444,12 @@ class MDFValidator:
             return
 
         # skip module validation if module_docstrings is disabled
-        if element.element_type == "module":
-            if self.config is not None and not self.config.module_docstrings:
-                return
+        if (
+            element.element_type == "module"
+            and self.config is not None
+            and not self.config.module_docstrings
+        ):
+            return
 
         if element.docstring is None:
             if self._should_have_docstring(element):
@@ -507,9 +494,7 @@ class MDFValidator:
         """
         # skip modules if module_docstrings is disabled
         if element.element_type == "module":
-            return not (
-                self.config is not None and not self.config.module_docstrings
-            )
+            return not (self.config is not None and not self.config.module_docstrings)
 
         # skip private elements
         if element.name.startswith("_") and not element.name.startswith("__"):
@@ -517,13 +502,10 @@ class MDFValidator:
 
         # skip special methods
         return not (
-            element.element_type == "method"
-            and element.name.split(".")[-1].startswith("__")
+            element.element_type == "method" and element.name.split(".")[-1].startswith("__")
         )
 
-    def _validate_against_code(
-        self, parsed: ParsedDocstring, element: CodeElement
-    ) -> None:
+    def _validate_against_code(self, parsed: ParsedDocstring, element: CodeElement) -> None:
         """validate parsed docstring against actual code
 
         arguments:
@@ -544,9 +526,7 @@ class MDFValidator:
         if element.element_type == "class" and element.attributes:
             self._validate_attributes(parsed, element)
 
-    def _validate_arguments(
-        self, parsed: ParsedDocstring, element: CodeElement
-    ) -> None:
+    def _validate_arguments(self, parsed: ParsedDocstring, element: CodeElement) -> None:
         """validate that arguments match between docstring and code
 
         arguments:
@@ -589,11 +569,7 @@ class MDFValidator:
         for param_name in doc_params:
             if param_name not in code_args:
                 param = doc_params[param_name]
-                line_num = (
-                    param.location.line
-                    if param.location
-                    else element.line_number
-                )
+                line_num = param.location.line if param.location else element.line_number
                 self.diagnostics.add(
                     Diagnostic(
                         code=ErrorCode.EXTRA_FUNCTION_ARGUMENT_DECLARATION,
@@ -615,9 +591,7 @@ class MDFValidator:
                     )
                 )
 
-    def _validate_return_type(
-        self, parsed: ParsedDocstring, element: CodeElement
-    ) -> None:
+    def _validate_return_type(self, parsed: ParsedDocstring, element: CodeElement) -> None:
         """validate return type annotation
 
         arguments:
@@ -641,9 +615,7 @@ class MDFValidator:
                 )
             )
 
-    def _validate_attributes(
-        self, parsed: ParsedDocstring, element: CodeElement
-    ) -> None:
+    def _validate_attributes(self, parsed: ParsedDocstring, element: CodeElement) -> None:
         """validate class attributes.
 
         arguments:

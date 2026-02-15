@@ -6,7 +6,6 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 main entry point for the meadoc command-line interface.
 """
 
-
 import argparse
 import json
 import sys
@@ -63,13 +62,13 @@ class Issue(TypedDict):
     severity: str
 
 
-from ._version import __version__
-from .config import Config, find_project_root
-from .discovery import discover_python_files
-from .errors import ErrorSeverity
-from .generator import DocstringUpdater
-from .markdown import MarkdownGenerator
-from .validator import MDFValidator
+from ._version import __version__  # noqa: E402
+from .config import Config, find_project_root  # noqa: E402
+from .discovery import discover_python_files  # noqa: E402
+from .errors import ErrorSeverity  # noqa: E402
+from .generator import DocstringUpdater  # noqa: E402
+from .markdown import MarkdownGenerator  # noqa: E402
+from .validator import MDFValidator  # noqa: E402
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -80,7 +79,9 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="meadoc",
-        description="a docstring machine based on typing information for the meadow Docstring Format",
+        description=(
+            "a docstring machine based on typing information for the meadow Docstring Format"
+        ),
     )
 
     _ = parser.add_argument(
@@ -89,9 +90,7 @@ def create_parser() -> argparse.ArgumentParser:
         version=f"%(prog)s {__version__}",
     )
 
-    subparsers = parser.add_subparsers(
-        dest="command", help="available commands"
-    )
+    subparsers = parser.add_subparsers(dest="command", help="available commands")
 
     # format command
     format_parser = subparsers.add_parser(
@@ -297,9 +296,7 @@ def cmd_format(args: argparse.Namespace) -> int:
     results: list[FileResult] = []
 
     for file_path in files:
-        update_result = updater.update_file(
-            file_path, fix_malformed=fix_malformed_flag
-        )
+        update_result = updater.update_file(file_path, fix_malformed=fix_malformed_flag)
         file_result: FileResult = {
             "file": str(file_path),
             "generated": update_result["generated"],
@@ -317,17 +314,13 @@ def cmd_format(args: argparse.Namespace) -> int:
             file_str = result["file"]
             parts: list[str] = []
             if result["generated"]:
-                parts.append(
-                    f"generated {result['generated']} new docstring(s)"
-                )
+                parts.append(f"generated {result['generated']} new docstring(s)")
             if result["updated"]:
                 parts.append(f"updated {result['updated']} docstring(s)")
             if result["skipped"]:
                 parts.append(f"skipped {result['skipped']} docstring(s)")
             if result["malformed"]:
-                parts.append(
-                    f"found {result['malformed']} malformed docstring(s)"
-                )
+                parts.append(f"found {result['malformed']} malformed docstring(s)")
 
             if parts:
                 print(f"{file_str}: {', '.join(parts)}")
@@ -391,11 +384,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     if not files:
         if plumbing_mode:
-            print(
-                json.dumps(
-                    {"files": [], "issues": [], "summary": "no files found"}
-                )
-            )
+            print(json.dumps({"files": [], "issues": [], "summary": "no files found"}))
         else:
             print("no files found")
         return 0
@@ -424,22 +413,18 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     # output results
     if plumbing_mode:
-        print(
-            json.dumps(
-                {"files": [str(f) for f in files], "issues": all_issues}
-            )
-        )
+        print(json.dumps({"files": [str(f) for f in files], "issues": all_issues}))
     else:
         for issue in all_issues:
-            print(
-                f"{issue['file']}:{issue['line']}:{issue['column']}: {issue['code']}: {issue['message']}"
+            msg = (
+                f"{issue['file']}:{issue['line']}:{issue['column']}:"
+                f" {issue['code']}: {issue['message']}"
             )
+            print(msg)
 
         # print summary
         error_count = sum(1 for i in all_issues if i["severity"] == "ERROR")
-        warning_count = sum(
-            1 for i in all_issues if i["severity"] == "WARNING"
-        )
+        warning_count = sum(1 for i in all_issues if i["severity"] == "WARNING")
         info_count = sum(1 for i in all_issues if i["severity"] == "INFO")
 
         if error_count or warning_count or info_count:
@@ -500,11 +485,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
     if not files:
         if plumbing_mode:
-            print(
-                json.dumps(
-                    {"files": [], "markdown": "", "summary": "no files found"}
-                )
-            )
+            print(json.dumps({"files": [], "markdown": "", "summary": "no files found"}))
         else:
             print("no files found")
         return 0
@@ -521,11 +502,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
     # output results
     if plumbing_mode:
-        print(
-            json.dumps(
-                {"files": [str(f) for f in files], "markdown": markdown}
-            )
-        )
+        print(json.dumps({"files": [str(f) for f in files], "markdown": markdown}))
     elif output_path_str:
         output_path = Path(output_path_str)
         _ = output_path.write_text(markdown, encoding="utf-8")

@@ -7,7 +7,6 @@ this module provides parsing capabilities for the meadow Docstring Format,
 converting docstrings into a structured representation.
 """
 
-
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -186,9 +185,7 @@ class Section:
 
     section_type: SectionType
     content: list[str] = field(default_factory=list)
-    items: list[ParameterDoc | FunctionDoc | ExceptionDoc | ReturnDoc] = field(
-        default_factory=list
-    )
+    items: list[ParameterDoc | FunctionDoc | ExceptionDoc | ReturnDoc] = field(default_factory=list)
     location: Location | None = None
 
 
@@ -216,9 +213,7 @@ class ParsedDocstring:
     sections: list[Section] = field(default_factory=list)
     raw_text: str = ""
     is_mdf: bool = False
-    diagnostics: DiagnosticCollection = field(
-        default_factory=DiagnosticCollection
-    )
+    diagnostics: DiagnosticCollection = field(default_factory=DiagnosticCollection)
 
     def get_section(self, section_type: SectionType) -> Section | None:
         """get a section by type
@@ -443,11 +438,7 @@ class MDFParser:
             if re.search(pattern, docstring, re.MULTILINE):
                 return True
 
-        for pattern in google_patterns:
-            if re.search(pattern, docstring, re.MULTILINE):
-                return True
-
-        return False
+        return any(re.search(pattern, docstring, re.MULTILINE) for pattern in google_patterns)
 
     def _parse_section_content(self, section: Section) -> None:
         """parse the content of a section
@@ -464,24 +455,16 @@ class MDFParser:
             SectionType.ARGUMENTS,
             SectionType.PARAMETERS,
         ):
-            section.items.extend(
-                self._parse_parameters(section.content, section.location)
-            )
+            section.items.extend(self._parse_parameters(section.content, section.location))
         elif section.section_type in (
             SectionType.FUNCTIONS,
             SectionType.METHODS,
         ):
-            section.items.extend(
-                self._parse_functions(section.content, section.location)
-            )
+            section.items.extend(self._parse_functions(section.content, section.location))
         elif section.section_type == SectionType.RAISES:
-            section.items.extend(
-                self._parse_raises(section.content, section.location)
-            )
+            section.items.extend(self._parse_raises(section.content, section.location))
         elif section.section_type == SectionType.RETURNS:
-            section.items.extend(
-                self._parse_returns(section.content, section.location)
-            )
+            section.items.extend(self._parse_returns(section.content, section.location))
 
     def _parse_parameters(
         self, content: list[str], base_location: Location | None
@@ -516,9 +499,7 @@ class MDFParser:
                     declaration = stripped[1:backtick_end]
                     desc = stripped[backtick_end + 1 :].strip()
 
-                    name, type_ann, default = self._parse_declaration(
-                        declaration
-                    )
+                    name, type_ann, default = self._parse_declaration(declaration)
 
                     line_num = (base_location.line if base_location else 0) + i
                     current_param = ParameterDoc(
@@ -565,9 +546,7 @@ class MDFParser:
             if not stripped:
                 continue
 
-            if stripped.startswith("`def ") or stripped.startswith(
-                "`async def "
-            ):
+            if stripped.startswith("`def ") or stripped.startswith("`async def "):
                 if current_func:
                     functions.append(current_func)
 
@@ -590,9 +569,7 @@ class MDFParser:
                 signature_lines.append(stripped)
                 if stripped.endswith("`"):
                     collecting_signature = False
-                    full_sig = " ".join(
-                        s.strip().rstrip("`") for s in signature_lines
-                    )
+                    full_sig = " ".join(s.strip().rstrip("`") for s in signature_lines)
                     full_sig = full_sig.lstrip("`")
                     line_num = (base_location.line if base_location else 0) + i
                     current_func = FunctionDoc(
@@ -681,9 +658,7 @@ class MDFParser:
 
         return exceptions
 
-    def _parse_returns(
-        self, content: list[str], base_location: Location | None
-    ) -> list[ReturnDoc]:
+    def _parse_returns(self, content: list[str], base_location: Location | None) -> list[ReturnDoc]:
         """parse returns section content
 
         arguments:
@@ -752,9 +727,7 @@ class MDFParser:
 
         return returns
 
-    def _parse_declaration(
-        self, declaration: str
-    ) -> tuple[str, str, str | None]:
+    def _parse_declaration(self, declaration: str) -> tuple[str, str, str | None]:
         """parse a variable declaration like 'name: str = "default"'
 
         arguments:
@@ -784,9 +757,7 @@ class MDFParser:
 
         return name, type_ann, default
 
-    def _validate_section_order(
-        self, parsed: ParsedDocstring, line_offset: int
-    ) -> None:
+    def _validate_section_order(self, parsed: ParsedDocstring, line_offset: int) -> None:
         """validate that sections are in correct order
 
         arguments:
@@ -802,9 +773,7 @@ class MDFParser:
         for section in parsed.sections:
             current_order = SECTION_ORDER.get(section.section_type, 99)
             if current_order < last_order:
-                line_num = (
-                    section.location.line if section.location else line_offset
-                )
+                line_num = section.location.line if section.location else line_offset
                 self.diagnostics.add_error(
                     ErrorCode.SECTIONS_OUT_OF_ORDER,
                     f"section '{section.section_type.name}' is out of order",
