@@ -40,11 +40,12 @@ python_functions = "test_*"
 addopts = "-v --tb=short"
 
 [tool.basedpyright]
-include = ["src"]
+include = ["src", "stubs", "scripts"]
 exclude = [
     "**/__pycache__",
     ".venv",
     "venv",
+    "docs/ide_rendering_tests",
 ]
 pythonVersion = "3.13"
 pythonPlatform = "All"
@@ -89,12 +90,13 @@ ignore = [
     "D401",  # First line of docstring should be in imperative mood
     "D400",  # First line should end with a period
     "D403",  # First word of docstring should be capitalized (lowercase style)
+    "D404",  # First word of the docstring should not be "This"
     "D405",  # Section name should be properly capitalized (lowercase style)
     "D413",  # Missing blank line after last section ("arguments")
     "D415",  # First line should end with a period
     "D417",  # Missing argument descriptions in docstring
     
-    # do NOT re-enable these.
+    # do NOT re-enable these
     # "E501",  # Line too long
     # "SIM102",  # Use single if instead of nested if
 ]

@@ -14,7 +14,10 @@ This is meadow: a docstring machine based on typing information for the meadow D
 
 ```bash
 # strict static analysis + type check
-uv run basedpyright src
+uv run basedpyright src scripts
+
+# general linting
+uv run ruff check .
 
 # type safety
 uv run mypy .

@@ -1,29 +1,27 @@
 class TestOld:
     """This is a test class.
 
-           Add some spaces
+       Add some spaces
 
-        more test
+    more test
     """
+
     ...
 
 class TestSingleLine:
-    """
-    aaa
-        `bbb bbb`
-            ccc
+    """aaa
+    `bbb bbb`
+        ccc
     """
 
 class TestSingleLineWithColon:
-    """
-    aaa
-        `bbb: bbb`
-            ccc
+    """aaa
+    `bbb: bbb`
+        ccc
     """
 
 class TestMultiline:
-    """
-    ddd
+    """ddd
         `eee
         eee
         eee`
@@ -31,14 +29,15 @@ class TestMultiline:
     
     ggg
     """
+
     ...
-    
+
 class TestMultilineWithIndent:
+    """xxx
+    `yyy
+        yyy
+    yyy`
+        zzz 
     """
-    xxx
-        `yyy
-            yyy
-        yyy`
-            zzz 
-    """
+
     ...
