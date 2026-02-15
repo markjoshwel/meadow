@@ -46,9 +46,7 @@ exclude = [
 pythonVersion = "3.13"
 pythonPlatform = "All"
 stubPath = "stubs"
-
-# strict mode overrides
-strictList = ["src"]
+strict = ["src"]
 reportUnnecessaryComparison = false
 reportUnknownVariableType = false
 reportArgumentType = false
