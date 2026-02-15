@@ -288,9 +288,9 @@ def cmd_format(args: argparse.Namespace) -> int:
             summary_parts.append(f"{total_malformed} malformed")
 
         if summary_parts:
-            print(f"\nmeadoc format: {', '.join(summary_parts)}")
+            print(f"\n{', '.join(summary_parts)}")
         else:
-            print("\nmeadoc format: no changes needed")
+            print("\nno changes needed")
 
     return 0
 
@@ -384,9 +384,9 @@ def cmd_check(args: argparse.Namespace) -> int:
                 parts.append(f"{warning_count} warning(s)")
             if info_count:
                 parts.append(f"{info_count} info")
-            print(f"\nmeadoc check: {', '.join(parts)}")
+            print(f"\n{', '.join(parts)}")
         else:
-            print("\nmeadoc check: success - no issues found")
+            print("\nsuccess - no issues found")
 
     return 1 if has_errors else 0
 
@@ -450,10 +450,10 @@ def cmd_generate(args: argparse.Namespace) -> int:
         output_path = Path(args.output)
         output_path.write_text(markdown, encoding="utf-8")
         print(f"generated markdown written to {args.output}")
-        print(f"\nmeadoc generate: processed {len(files)} file(s)")
+        print(f"\nprocessed {len(files)} file(s)")
     else:
         print(markdown)
-        print(f"\nmeadoc generate: processed {len(files)} file(s)")
+        print(f"\nprocessed {len(files)} file(s)")
 
     return 0
 
