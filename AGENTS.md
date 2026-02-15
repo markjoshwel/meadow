@@ -26,7 +26,7 @@ uv run mypy
 uv run raiseattention check
 
 # MDF compliance (self-check)
-uv run meadoc
+uv run meadoc check
 ```
 
 ## Code Standards
