@@ -6,18 +6,12 @@
 Exception
 └── MeadowError (meadow base)
     ├── ConfigError (configuration issues)
-    │   └── ConfigFileNotFoundError
-    │   └── ConfigParseError
-    │   └── ConfigValidationError
     ├── ParseError (docstring parsing failures)
-    │   └── InvalidSectionError
-    │   └── MalformedDocstringError
     ├── ValidationError (validation failures)
-    │   └── MissingDocstringError
-    │   └── OutdatedDocstringError
     └── GenerationError (docstring generation failures)
-        └── FileWriteError
 ```
+
+All meadow exceptions inherit from `MeadowError` and carry context.
 
 ## Design Principles
 
@@ -46,12 +40,9 @@ from meadow.errors import ConfigError, ParseError
 
 try:
     config = Config.load(path)
-except ConfigFileNotFoundError:
-    # Use defaults
-    config = Config.default()
-except ConfigParseError as exc:
-    # Report syntax error
-    print(f"Config syntax error: {exc.message}")
+except ConfigError as exc:
+    # Handle configuration issues
+    print(f"Config error: {exc.message}")
 ```
 
 ### Error Context
@@ -61,28 +52,24 @@ All exceptions provide:
 ```python
 exc.message      # Human-readable description
 exc.location     # Location (file, line, column) or None
-exc.code         # ErrorCode enum (for validation errors)
 exc.__str__()    # Formatted: "path:line:col: message"
 ```
 
-## Exit Codes
+## Error Reporting Format
 
-CLI uses these exit codes:
-
-- `0`: Success
-- `1`: Usage error (bad arguments)
-- `2`: Configuration error
-- `3`: Parse error
-- `4`: Validation error
-- `5`: Generation error
-- `255`: Unexpected error
-
-## Error Messages
-
-Follow the format: `meadow: severity: message`
+Error messages follow the format: `program: level: message`
 
 Examples:
 ```
 meadow: error: missing preamble in docstring at src/main.py:42:0
 meadow: warning: outdated argument 'old_param' at src/lib.py:15:8
 ```
+
+## Error Codes
+
+The `ErrorCode` enum provides specific codes for different issues:
+- MDW1xx: Missing docstring issues
+- MDW2xx: Malformed docstring issues  
+- MDW3xx: Outdated docstring issues
+
+See `errors.py` for the full list.

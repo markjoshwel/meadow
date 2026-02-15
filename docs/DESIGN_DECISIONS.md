@@ -25,7 +25,6 @@ MeadowError (base)
 Each carries context:
 - `location`: Where the error occurred
 - `message`: Human-readable description
-- `code`: ErrorCode enum value
 
 ## Type Safety Strategy
 
@@ -41,18 +40,6 @@ Each carries context:
 3. `pyproject.toml` (lowest precedence)
 
 This allows project-level overrides without modifying pyproject.toml.
-
-## Pattern Matching vs if-elif chains
-
-Python 3.13's `match` statement is used for:
-- AST node type dispatch
-- Error code categorisation
-- Configuration value extraction
-
-Benefits:
-- Exhaustiveness checking (pyright can verify all cases handled)
-- Cleaner syntax for complex conditions
-- Better performance for many-branched logic
 
 ## Why MDF Over Existing Formats?
 

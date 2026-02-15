@@ -53,9 +53,10 @@ src/meadow/
 
 ## Current Status
 
-Comprehensive rewrite in progress:
-- ✅ Type safety (strict basedpyright compliance)
+Comprehensive rewrite **completed** and ready for publication:
+- ✅ Type safety (strict basedpyright compliance - 0 errors, 0 warnings)
 - ✅ Exception safety (MeadowError hierarchy)
-- ✅ MDF docstring compliance
+- ✅ MDF docstring compliance (self-check passes)
 - ✅ Code maintainability improvements
-- 🔄 Tests modernisation in progress
+- ✅ Test modernisation complete (44 tests passing)
+- ✅ Version 2026.2.15 tagged and ready

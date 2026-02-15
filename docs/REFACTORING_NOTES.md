@@ -47,8 +47,7 @@ raise ConfigError("Invalid config", location=Location(1, 0, "config.py"))
 
 - **Removed**: `CodeAnalyzer` class with state
 - **Added**: `analyse_file()` pure function returning `list[CodeElement]`
-- **Removed**: `MDFValidator` class
-- **Added**: `validate_element()` pure function
+- **Changed**: `MDFValidator` class with `validate_file()` method
 
 #### `generator.py`
 

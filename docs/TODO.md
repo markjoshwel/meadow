@@ -19,7 +19,7 @@ Status: **Completed** ✅
   - main.py: Strict typing, proper exit codes
 - ✅ Test modernisation (updated to use new API)
 - ✅ AGENTS.md update (lean with links to docs)
-- ✅ Final verification (all 40 tests pass)
+- ✅ Final verification (all 44 tests pass)
 - ✅ MDF docstring style compliance (lowercase throughout)
 
 ### In Progress

@@ -64,9 +64,9 @@ Uses dataclasses for AST-like representation.
 
 ### `validator.py`
 Validation against actual code:
-- `CodeAnalyzer` → `analyse_file()` (pure function)
-- `CodeElement` (extracted code info)
-- `MDFValidator` → `validate_file()` (pure function)
+- `analyse_file()` (pure function) - extracts `CodeElement` info from Python files
+- `CodeElement` (dataclass with extracted code info)
+- `MDFValidator` (class with `validate_file()` method)
 - Cross-reference docstring with AST
 
 Uses Python's `ast` module for code analysis.
