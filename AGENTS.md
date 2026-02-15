@@ -45,6 +45,7 @@ src/meadow/
 ├── config.py         # Configuration loading (toml)
 ├── discovery.py      # File discovery, gitignore support
 ├── parser.py         # MDF docstring parser
+├── stdlib_links.py   # Baked-in standard library doc URLs
 ├── validator.py      # Validation against code
 ├── generator.py      # Docstring generation
 ├── markdown.py       # Markdown API doc generation
@@ -54,9 +55,11 @@ src/meadow/
 ## Current Status
 
 Comprehensive rewrite **completed** and ready for publication:
-- ✅ Type safety (strict basedpyright compliance - 0 errors, 0 warnings)
+- ⚠️ Type safety (4 basedpyright errors in markdown.py due to incomplete tomlkit type stubs)
 - ✅ Exception safety (MeadowError hierarchy)
 - ✅ MDF docstring compliance (self-check passes)
 - ✅ Code maintainability improvements
-- ✅ Test modernisation complete (44 tests passing)
+- ✅ Test modernisation complete (39 tests passing)
+- ✅ Baked-in stdlib documentation links (252 modules)
+- ✅ External link auto-discovery for third-party types
 - ✅ Version 2026.2.15 tagged and ready

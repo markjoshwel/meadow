@@ -19,7 +19,7 @@ Status: **Completed** ✅
   - main.py: Strict typing, proper exit codes
 - ✅ Test modernisation (updated to use new API)
 - ✅ AGENTS.md update (lean with links to docs)
-- ✅ Final verification (all 44 tests pass)
+- ✅ Final verification (all 39 tests pass)
 - ✅ MDF docstring style compliance (lowercase throughout)
 
 ### In Progress
@@ -40,6 +40,6 @@ Major improvements in this rewrite:
 - **British Spelling**: Consistent use throughout (behaviour, colour, etc.)
 
 Remaining type warnings are from incomplete tomlkit type stubs (external dependency).
-All functional tests pass (40/40).
+All functional tests pass (39/39).
 
 See [REFACTORING_NOTES.md](REFACTORING_NOTES.md) for detailed API changes.

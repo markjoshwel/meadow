@@ -653,6 +653,8 @@ to external type documentation.
 
 4. **link generation**: subsequent runs create clickable links in markdown
 
+**note:** standard library types (e.g., `pathlib.Path`, `datetime.datetime`) are automatically linked to the Python documentation without any configuration required.
+
 **file separation:**
 
 keep handwritten config in `pyproject.toml` and auto-populated external links
