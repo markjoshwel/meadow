@@ -8,8 +8,12 @@ this module generates markdown API reference documentation from MDF docstrings.
 
 from __future__ import annotations
 
+import ast
+import sys
 from pathlib import Path
-from typing import NewType
+from typing import NewType, cast
+
+import tomlkit
 
 from .config import GenerateConfig
 from .parser import (
@@ -23,6 +27,138 @@ from .validator import CodeElement, analyse_file
 
 # type alias for markdown content
 Markdown = NewType("Markdown", str)
+
+# standard library modules for external link auto-discovery
+STDLIB_MODULES: frozenset[str] = frozenset(
+    [
+        *sys.builtin_module_names,
+        # common stdlib modules that might be imported
+        "abc",
+        "argparse",
+        "ast",
+        "asyncio",
+        "base64",
+        "bisect",
+        "builtins",
+        "calendar",
+        "collections",
+        "concurrent",
+        "configparser",
+        "contextlib",
+        "copy",
+        "csv",
+        "ctypes",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "difflib",
+        "dis",
+        "enum",
+        "fractions",
+        "functools",
+        "glob",
+        "graphlib",
+        "hashlib",
+        "heapq",
+        "hmac",
+        "html",
+        "http",
+        "idlelib",
+        "imghdr",
+        "inspect",
+        "io",
+        "ipaddress",
+        "itertools",
+        "json",
+        "keyword",
+        "linecache",
+        "locale",
+        "logging",
+        "mailbox",
+        "math",
+        "mimetypes",
+        "mmap",
+        "multiprocessing",
+        "numbers",
+        "operator",
+        "os",
+        "pathlib",
+        "pickle",
+        "platform",
+        "posixpath",
+        "pprint",
+        "profile",
+        "pstats",
+        "pty",
+        "pwd",
+        "queue",
+        "quopri",
+        "random",
+        "re",
+        "reprlib",
+        "resource",
+        "secrets",
+        "select",
+        "selectors",
+        "shelve",
+        "shlex",
+        "shutil",
+        "signal",
+        "site",
+        "socket",
+        "socketserver",
+        "sqlite3",
+        "ssl",
+        "stat",
+        "statistics",
+        "string",
+        "stringprep",
+        "struct",
+        "subprocess",
+        "sunau",
+        "symtable",
+        "sys",
+        "sysconfig",
+        "tabnanny",
+        "tarfile",
+        "telnetlib",
+        "tempfile",
+        "textwrap",
+        "threading",
+        "time",
+        "timeit",
+        "token",
+        "tokenize",
+        "trace",
+        "traceback",
+        "tracemalloc",
+        "tty",
+        "turtle",
+        "turtledemo",
+        "types",
+        "typing",
+        "unicodedata",
+        "unittest",
+        "urllib",
+        "uu",
+        "uuid",
+        "venv",
+        "warnings",
+        "wave",
+        "weakref",
+        "webbrowser",
+        "winreg",
+        "winsound",
+        "wsgiref",
+        "xdrlib",
+        "xml",
+        "xmlrpc",
+        "zipapp",
+        "zipfile",
+        "zipimport",
+        "zlib",
+    ]
+)
 
 
 class MarkdownGenerator:
@@ -521,3 +657,288 @@ class MarkdownGenerator:
             lines.append(first_line)
 
         return lines
+
+    def collect_external_types(self, file_paths: list[Path]) -> set[str]:
+        """collect all external type references from docstrings
+
+        scans all files and collects type annotations that reference
+        external modules (stdlib or third-party).
+
+        arguments:
+            `file_paths: list[Path]`
+                list of python files to scan
+
+        returns: `set[str]`
+            set of fully qualified type names (e.g., "pathlib.Path")
+        """
+        external_types: set[str] = set()
+
+        for file_path in file_paths:
+            elements = analyse_file(file_path)
+            if elements is None:
+                continue
+
+            for element in elements:
+                if not element.docstring:
+                    continue
+
+                from meadow.parser import MDFParser
+
+                parser = MDFParser()
+                parsed = parser.parse(element.docstring, element.line_number)
+
+                if not parsed.is_mdf:
+                    continue
+
+                # collect types from arguments/attributes
+                for section_type in (
+                    SectionType.ARGUMENTS,
+                    SectionType.PARAMETERS,
+                    SectionType.ATTRIBUTES,
+                ):
+                    section = parsed.get_section(section_type)
+                    if section:
+                        for item in section.items:
+                            if isinstance(item, ParameterDoc):
+                                if item.type_annotation:
+                                    types = (
+                                        self._extract_types_from_annotation(
+                                            item.type_annotation
+                                        )
+                                    )
+                                    external_types.update(types)
+
+                # collect types from returns
+                returns_section = parsed.get_section(SectionType.RETURNS)
+                if returns_section:
+                    for item in returns_section.items:
+                        if isinstance(item, ReturnDoc):
+                            if item.type_annotation:
+                                types = self._extract_types_from_annotation(
+                                    item.type_annotation
+                                )
+                                external_types.update(types)
+
+                # collect types from raises
+                raises_section = parsed.get_section(SectionType.RAISES)
+                if raises_section:
+                    for item in raises_section.items:
+                        if isinstance(item, ExceptionDoc):
+                            if "." in item.exception_class:
+                                # already fully qualified
+                                external_types.add(item.exception_class)
+                            else:
+                                # check if it's a stdlib exception
+                                module = self._guess_exception_module(
+                                    item.exception_class
+                                )
+                                if module:
+                                    external_types.add(
+                                        f"{module}.{item.exception_class}"
+                                    )
+
+        return external_types
+
+    def _extract_types_from_annotation(self, annotation: str) -> set[str]:
+        """extract external type references from a type annotation
+
+        arguments:
+            `annotation: str`
+                type annotation string (e.g., "list[pathlib.Path] | None")
+
+        returns: `set[str]`
+            set of fully qualified type names
+        """
+        types: set[str] = set()
+
+        # parse the annotation using ast
+        try:
+            tree = ast.parse(annotation, mode="eval")
+        except SyntaxError:
+            return types
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                # simple name like "Path" - can't determine module
+                pass
+            elif isinstance(node, ast.Attribute):
+                # qualified name like "pathlib.Path"
+                if isinstance(node.value, ast.Name):
+                    module = node.value.id
+                    type_name = node.attr
+                    if module in STDLIB_MODULES:
+                        types.add(f"{module}.{type_name}")
+                    elif module not in ("self", "cls"):
+                        # likely third-party
+                        types.add(f"{module}.{type_name}")
+            elif isinstance(node, ast.Subscript):
+                # generic like "list[Path]" - handled by walking
+                pass
+
+        return types
+
+    def _guess_exception_module(self, exc_name: str) -> str | None:
+        """guess the module for an exception class
+
+        arguments:
+            `exc_name: str`
+                exception class name
+
+        returns: `str | None`
+            module name if it's a known exception, None otherwise
+        """
+        # common stdlib exceptions
+        builtins_exceptions = {
+            "Exception",
+            "BaseException",
+            "ArithmeticError",
+            "AssertionError",
+            "AttributeError",
+            "BlockingIOError",
+            "BrokenPipeError",
+            "BufferError",
+            "BytesWarning",
+            "ChildProcessError",
+            "ConnectionAbortedError",
+            "ConnectionError",
+            "ConnectionRefusedError",
+            "ConnectionResetError",
+            "DeprecationWarning",
+            "EOFError",
+            "EnvironmentError",
+            "FileExistsError",
+            "FileNotFoundError",
+            "FloatingPointError",
+            "FutureWarning",
+            "GeneratorExit",
+            "IOError",
+            "ImportError",
+            "ImportWarning",
+            "IndentationError",
+            "IndexError",
+            "InterruptedError",
+            "IsADirectoryError",
+            "KeyError",
+            "KeyboardInterrupt",
+            "LookupError",
+            "MemoryError",
+            "ModuleNotFoundError",
+            "NameError",
+            "NotADirectoryError",
+            "NotImplementedError",
+            "OSError",
+            "OverflowError",
+            "PendingDeprecationWarning",
+            "PermissionError",
+            "ProcessLookupError",
+            "RecursionError",
+            "ReferenceError",
+            "ResourceWarning",
+            "RuntimeError",
+            "RuntimeWarning",
+            "StopAsyncIteration",
+            "StopIteration",
+            "SyntaxError",
+            "SyntaxWarning",
+            "SystemError",
+            "SystemExit",
+            "TabError",
+            "TimeoutError",
+            "TypeError",
+            "UnboundLocalError",
+            "UnicodeDecodeError",
+            "UnicodeEncodeError",
+            "UnicodeError",
+            "UnicodeTranslateError",
+            "UnicodeWarning",
+            "UserWarning",
+            "ValueError",
+            "Warning",
+            "ZeroDivisionError",
+        }
+
+        if exc_name in builtins_exceptions:
+            return "builtins"
+
+        return None
+
+    def update_external_links(
+        self,
+        external_types: set[str],
+        project_root: Path,
+    ) -> None:
+        """update external links file with newly discovered types
+
+        adds any types not already present in the external links
+        configuration to the external link reference file.
+
+        arguments:
+            `external_types: set[str]`
+                set of external type names to add
+            `project_root: Path`
+                project root for finding the config file
+
+        returns: `none`
+            no return value
+        """
+        if not external_types:
+            return
+
+        # determine which file to update
+        link_ref_file = self.config.external_link_reference
+        config_path = project_root / link_ref_file
+
+        # load existing config from file if it exists
+        existing_links: dict[str, str] = {}
+        doc = tomlkit.document()
+
+        if config_path.exists():
+            try:
+                content = config_path.read_text(encoding="utf-8")
+                parsed_doc = tomlkit.parse(content)
+                if parsed_doc is not None:  # type: ignore
+                    # get existing external links
+                    meadoc_table = parsed_doc.get("meadoc")
+                    if isinstance(meadoc_table, dict):
+                        generate_table = meadoc_table.get("generate")
+                        if isinstance(generate_table, dict):
+                            links_table = generate_table.get("external-links")
+                            if isinstance(links_table, dict):
+                                for k_obj, v_obj in links_table.items():  # type: ignore
+                                    existing_links[
+                                        str(cast(object, k_obj))
+                                    ] = str(cast(object, v_obj))
+                        # Re-use the parsed document structure
+                        doc = parsed_doc
+            except Exception:
+                pass
+
+        # find new types not already in config
+        new_types = external_types - set(existing_links.keys())
+
+        if not new_types:
+            return
+
+        # Check if we need to create new tables or if they exist
+        meadoc_table = doc.get("meadoc")
+        if meadoc_table is None:
+            meadoc_table = tomlkit.table()
+            doc["meadoc"] = meadoc_table
+
+        if "generate" not in meadoc_table:  # type: ignore[operator]
+            meadoc_table["generate"] = tomlkit.table()
+        generate_table = meadoc_table["generate"]
+
+        if "external-links" not in generate_table:  # type: ignore[operator]
+            generate_table["external-links"] = tomlkit.table()
+        links_table = generate_table["external-links"]
+
+        # add new types with empty values
+        for type_name in sorted(new_types):
+            links_table[type_name] = ""  # type: ignore
+
+        # write back to file
+        try:
+            _ = config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+        except Exception:
+            pass  # silently fail if can't write

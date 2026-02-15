@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 import tomlkit
+from libsightseeing import find_project_root as _find_project_root
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
@@ -564,8 +565,8 @@ class Config:
 def find_project_root(start_path: Path | None = None) -> Path:
     """find the project root directory
 
-    searches for common project indicators like .git, pyproject.toml,
-    and meadoc.toml files
+    uses libsightseeing to find the project root by looking for common
+    project markers like .git, pyproject.toml, etc.
 
     arguments:
         `start_path: Path | None = None`
@@ -577,18 +578,9 @@ def find_project_root(start_path: Path | None = None) -> Path:
     if start_path is None:
         start_path = Path.cwd()
 
-    indicators = [
-        ".git",
-        "pyproject.toml",
-        "setup.py",
-        "setup.cfg",
-        ".meadoc.toml",
-        "meadoc.toml",
-    ]
-
-    for parent in [start_path, *start_path.parents]:
-        for indicator in indicators:
-            if (parent / indicator).exists():
-                return parent
+    # use libsightseeing's find_project_root
+    result = _find_project_root(start_path)
+    if result is not None:
+        return result
 
     return start_path

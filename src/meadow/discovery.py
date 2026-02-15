@@ -1,18 +1,18 @@
-"""file discovery for meadow.
+"""file discovery for meadow using libsightseeing.
 
 with all my heart, 2026, mark joshwel <mark@joshwel.co>
 SPDX-License-Identifier: Unlicense OR 0BSD
 
-this module provides file discovery capabilities, respecting gitignore patterns
-and supporting include/exclude glob patterns.
+this module provides file discovery capabilities, using libsightseeing for
+file finding with gitignore support and include/exclude pattern matching.
 """
 
 from __future__ import annotations
 
-import fnmatch
-import os
 from collections.abc import Iterator
 from pathlib import Path
+
+from libsightseeing import SourceResolver
 
 from .config import Config
 
@@ -24,11 +24,14 @@ def discover_python_files(
 ) -> Iterator[Path]:
     """discover python files based on sources and configuration
 
+    uses libsightseeing SourceResolver for efficient file discovery with
+    gitignore support and pattern matching.
+
     arguments:
         `sources: list[Path]`
             list of source files or directories to search
         `config: Config`
-            meadow configuration
+            meadow configuration with include/exclude patterns
         `respect_gitignore: bool = True`
             whether to respect .gitignore files
 
@@ -45,157 +48,47 @@ def discover_python_files(
     # collect all files
     all_files: set[Path] = set()
 
+    # use include patterns from config if available, otherwise default
+    include_patterns = config.include if config.include else ["**/*.py"]
+    exclude_patterns = config.exclude
+
+    # respect gitignore from config unless overridden
+    should_respect_gitignore = respect_gitignore and config.respect_gitignore
+
     for source in sources:
         if source.is_file():
             if source.suffix == ".py":
                 all_files.add(source.resolve())
         elif source.is_dir():
-            # walk directory
-            for root, dirs, files in os.walk(source):
-                root_path = Path(root)
+            # Adjust include patterns to be relative to the source directory
+            # e.g., if source is 'src' and pattern is 'src/**/*.py', use '**/*.py'
+            source_name = source.name
+            adjusted_patterns: list[str] = []
+            for pattern in include_patterns:
+                if pattern.startswith(f"{source_name}/"):
+                    adjusted_patterns.append(pattern[len(source_name) + 1 :])
+                else:
+                    adjusted_patterns.append(pattern)
 
-                # filter directories based on exclude patterns
-                dirs[:] = [
-                    d
-                    for d in dirs
-                    if not _matches_exclude(root_path / d, config.exclude)
-                ]
-
-                # check gitignore
-                if respect_gitignore and config.respect_gitignore:
-                    gitignore_path = root_path / ".gitignore"
-                    if gitignore_path.exists():
-                        gitignore_patterns = _parse_gitignore(gitignore_path)
-                        dirs[:] = [
-                            d
-                            for d in dirs
-                            if not _matches_gitignore(d, gitignore_patterns)
-                        ]
-
-                for file in files:
-                    if file.endswith(".py"):
-                        file_path = root_path / file
-
-                        # check exclude patterns
-                        if _matches_exclude(file_path, config.exclude):
-                            continue
-
-                        # check gitignore
-                        if respect_gitignore and config.respect_gitignore:
-                            gitignore_path = root_path / ".gitignore"
-                            if gitignore_path.exists():
-                                gitignore_patterns = _parse_gitignore(
-                                    gitignore_path
-                                )
-                                if _matches_gitignore(
-                                    file, gitignore_patterns
-                                ):
-                                    continue
-
-                        all_files.add(file_path.resolve())
+            # use libsightseeing for directory traversal
+            resolver = SourceResolver(
+                root=source,
+                include=adjusted_patterns,
+                exclude=exclude_patterns,
+                respect_gitignore=should_respect_gitignore,
+            )
+            for file_path in resolver.resolve():
+                all_files.add(file_path.resolve())
 
     # yield sorted files for consistent ordering
     for file_path in sorted(all_files):
         yield file_path
 
 
-def _matches_exclude(file_path: Path, exclude_patterns: list[str]) -> bool:
-    """check if a file matches any exclude pattern.
-
-    arguments:
-        `file_path: Path`
-            the file path to check
-        `exclude_patterns: list[str]`
-            list of glob patterns to match against
-
-    returns: `bool`
-        True if the file matches any exclude pattern
-    """
-    path_str = str(file_path)
-    name = file_path.name
-
-    for pattern in exclude_patterns:
-        # exact match on filename
-        if name == pattern:
-            return True
-        # glob match on filename
-        if fnmatch.fnmatch(name, pattern):
-            return True
-        # glob match on full path
-        if fnmatch.fnmatch(path_str, pattern):
-            return True
-        # check if any parent directory matches (for directory patterns)
-        for parent in file_path.parents:
-            parent_name = parent.name
-            if parent_name == pattern:
-                return True
-            if fnmatch.fnmatch(parent_name, pattern):
-                return True
-
-    return False
-
-
-def _parse_gitignore(gitignore_path: Path) -> list[str]:
-    """parse a .gitignore file and return patterns.
-
-    arguments:
-        `gitignore_path: Path`
-            path to the .gitignore file
-
-    returns: `list[str]`
-        list of gitignore patterns (excluding comments and negations)
-    """
-    patterns: list[str] = []
-
-    try:
-        with open(gitignore_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                # skip comments and empty lines
-                if not line or line.startswith("#"):
-                    continue
-                # skip negation patterns for simplicity
-                if line.startswith("!"):
-                    continue
-                patterns.append(line)
-    except Exception:
-        pass
-
-    return patterns
-
-
-def _matches_gitignore(name: str, patterns: list[str]) -> bool:
-    """check if a name matches any gitignore pattern.
-
-    arguments:
-        `name: str`
-            the name to check (file or directory name)
-        `patterns: list[str]`
-            list of gitignore patterns
-
-    returns: `bool`
-        True if the name matches any pattern
-    """
-    for pattern in patterns:
-        # handle directory patterns
-        if pattern.endswith("/"):
-            pattern = pattern[:-1]
-
-        # simple exact match
-        if name == pattern:
-            return True
-
-        # glob match
-        if fnmatch.fnmatch(name, pattern):
-            return True
-
-    return False
-
-
 def should_process_file(
     file_path: Path,
     config: Config,
-    respect_gitignore: bool = True,
+    _respect_gitignore: bool = True,
 ) -> bool:
     """check if a file should be processed based on configuration
 
@@ -204,8 +97,8 @@ def should_process_file(
             the file to check
         `config: Config`
             meadow configuration
-        `respect_gitignore: bool = True`
-            whether to respect .gitignore files
+        `_respect_gitignore: bool = True`
+            whether to respect .gitignore files (unused, kept for api compatibility)
 
     returns: `bool`
         true if the file should be processed
@@ -215,15 +108,28 @@ def should_process_file(
         return False
 
     # check exclude patterns
-    if _matches_exclude(file_path, config.exclude):
-        return False
+    exclude_patterns = config.exclude
+    name = file_path.name
+    path_str = str(file_path)
 
-    # check gitignore
-    if respect_gitignore and config.respect_gitignore:
-        gitignore_path = file_path.parent / ".gitignore"
-        if gitignore_path.exists():
-            patterns = _parse_gitignore(gitignore_path)
-            if _matches_gitignore(file_path.name, patterns):
+    for pattern in exclude_patterns:
+        # exact match on filename
+        if name == pattern:
+            return False
+        # glob match on filename
+        import fnmatch
+
+        if fnmatch.fnmatch(name, pattern):
+            return False
+        # glob match on full path
+        if fnmatch.fnmatch(path_str, pattern):
+            return False
+        # check if any parent directory matches (for directory patterns)
+        for parent in file_path.parents:
+            parent_name = parent.name
+            if parent_name == pattern:
+                return False
+            if fnmatch.fnmatch(parent_name, pattern):
                 return False
 
     return True

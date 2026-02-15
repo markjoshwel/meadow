@@ -137,7 +137,7 @@ the format is comprised of multiple sections:
             `FloatingPointError`
                 secret third thing
 
-        returns: float
+        returns: `float`
             the result, a divided by b
         """
         return a / b
@@ -288,9 +288,9 @@ meadoc format [source ...]
 
 <!-- markdownlint-disable line-length -->
 ```text
-src/meadow/ignore.py: generated 1 new docstring, updated 1 docstring, and skipped 1 malformed docstring
-src/meadow/main.py: updated 3 docstrings
-src/meadow/common.py: all 12 relevant docstrings are compliant
+src/meadow/ignore.py: generated 1 new docstring(s), updated 1 docstring(s), skipped 1 malformed docstring(s)
+src/meadow/main.py: updated 3 docstring(s)
+3 generated, 3 updated, 1 skipped
 ```
 <!-- markdownlint-enable -->
 
@@ -397,7 +397,7 @@ meadoc generate [source ...] [-o --output FILE]
 **usage:**
 
 ```text
-meadoc config [pyproject.toml | meadoc.toml]
+meadoc config [pyproject.toml | meadoc.toml | .meadoc.toml]
 ```
 
 **behaviour:**
@@ -405,12 +405,12 @@ meadoc config [pyproject.toml | meadoc.toml]
 1. if no arguments are provided, prints the documentation about
     [configuration](#configuration) to stdout
 
-2. if either "pyproject.toml" or "meadoc.toml" were provided as a subcommand,
+2. if "pyproject.toml", "meadoc.toml", or ".meadoc.toml" were provided as a subcommand,
     print the appropriate example configuration
 
-    - if "pyproject.toml" was provided, the parent toml table is `[tool.meadow]`
+    - if "pyproject.toml" was provided, the parent toml table is `[tool.meadoc]`
 
-    - if "meadoc.toml" was provided, the parent toml table is `[meadow]`
+    - if "meadoc.toml" or ".meadoc.toml" was provided, the parent toml table is `[meadoc]`
 
     - if configuration options were passed in, like `--exclude`, the printed
       configuration will be updated with the provided values
@@ -513,7 +513,7 @@ library.
 > **heads up** \
 > this is readable with `meadoc config`
 
-this is attempt to be loaded from:
+configuration is loaded from:
 
 1. `.meadoc.toml`
 2. `meadoc.toml`
@@ -613,13 +613,64 @@ starting-header-level = 2  # 1-6, sets h2="api reference" by default
 include-toc = true  # set to false to disable table of contents
 
 [meadoc.generate.external-links]
-# this is not actually included with the default configuration,
-# but an example of how external links would be configured.
+# external links enable clickable references to third-party and standard
+# library types in generated markdown documentation.
 #
-# on running `meadoc format` or `meadoc check`, any third party modules
-# encountered will be noted down here, allowing you to add links to them if
-# you would want clickable links in the generated markdown.
-"tomlkit.TOMLDocument" = "https://tomlkit.readthedocs.io/en/latest/api/#tomlkit.TOMLDocument"
+# workflow:
+# 1. run `meadoc generate` - any types not in the local codebase (stdlib
+#    or third-party like pydantic, tomlkit, etc.) are auto-discovered
+# 2. new types are added to the file specified by `external-link-reference`
+#    with an empty string value
+# 3. manually add the documentation urls for each type
+# 4. subsequent `meadoc generate` runs will create clickable links
+#
+# example:
+# "pathlib.Path" = "https://docs.python.org/3/library/pathlib.html#pathlib.Path"
+# "tomlkit.TOMLDocument" = "https://tomlkit.readthedocs.io/en/latest/api/#tomlkit.TOMLDocument"
+# "pydantic.BaseModel" = "https://docs.pydantic.dev/latest/api/base_model/#pydantic.BaseModel"
+```
+
+### external links workflow
+
+when generating markdown api documentation, meadoc can create clickable links
+to external type documentation.
+
+**how it works:**
+
+1. **auto-discovery**: during `meadoc generate`, all type annotations are scanned
+   - includes standard library types (`pathlib.Path`, `datetime.datetime`, etc.)
+   - includes third-party types (`pydantic.BaseModel`, `tomlkit.TOMLDocument`, etc.)
+
+2. **auto-registration**: new types are added to the external links file
+   (configured via `external-link-reference`, default: `meadoc.toml`)
+
+3. **manual configuration**: edit the file and add documentation urls:
+   ```toml
+   [meadoc.generate.external-links]
+   "pathlib.Path" = "https://docs.python.org/3/library/pathlib.html#pathlib.Path"
+   "pydantic.BaseModel" = "https://docs.pydantic.dev/latest/api/base_model/"
+   ```
+
+4. **link generation**: subsequent runs create clickable links in markdown
+
+**file separation:**
+
+keep handwritten config in `pyproject.toml` and auto-populated external links
+in `meadoc.toml`:
+
+```toml
+# pyproject.toml
+[tool.meadoc.generate]
+external-link-reference = "meadoc.toml"
+starting-header-level = 2
+```
+
+```toml
+# meadoc.toml (auto-populated)
+[meadoc.generate.external-links]
+"pathlib.Path" = ""
+"tomlkit.TOMLDocument" = ""
+# add urls above
 ```
 
 ## errors

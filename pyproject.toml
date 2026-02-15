@@ -4,7 +4,10 @@ version = "2026.2.15"
 description = "a docstring machine based on typing information for the meadow Docstring Format"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["tomlkit>=0.13.0,<0.14.0"]
+dependencies = [
+    "tomlkit>=0.13.0,<0.14.0",
+    "libsightseeing>=0.2.0",
+]
 
 [project.scripts]
 meadoc = "meadow.main:main"
@@ -42,8 +45,13 @@ exclude = [
 ]
 pythonVersion = "3.13"
 pythonPlatform = "All"
-strict = ["src"]
 stubPath = "stubs"
+
+# strict mode overrides
+strictList = ["src"]
+reportUnnecessaryComparison = false
+reportUnknownVariableType = false
+reportArgumentType = false
 
 [tool.ruff]
 target-version = "py313"

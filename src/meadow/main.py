@@ -515,6 +515,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
     base_path = find_project_root()
     markdown = generator.generate_for_files(files, base_path)
 
+    # collect and update external links
+    external_types = generator.collect_external_types(files)
+    if external_types:
+        generator.update_external_links(external_types, base_path)
+
     # output results
     if plumbing_mode:
         print(
