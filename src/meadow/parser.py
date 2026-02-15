@@ -22,18 +22,32 @@ T = TypeVar("T", "ParameterDoc", "FunctionDoc", "ExceptionDoc", "ReturnDoc")
 class SectionType(Enum):
     """types of sections in an MDF docstring.
 
-    members:
-        `PREAMBLE` - initial description line
-        `BODY` - additional description text
-        `ATTRIBUTES` - class attributes
-        `ARGUMENTS` - function arguments
-        `PARAMETERS` - alternative name for arguments
-        `FUNCTIONS` - module-level functions
-        `METHODS` - class methods
-        `RETURNS` - return type annotation
-        `RAISES` - exception classes
-        `USAGE` - usage examples
-        `UNKNOWN` - unrecognised section
+    this enum defines all the section types that can appear in an MDF
+    docstring, organised in the order they should appear.
+
+    attributes:
+        `PREAMBLE: SectionType`
+            initial description line (always first)
+        `BODY: SectionType`
+            additional description text
+        `ATTRIBUTES: SectionType`
+            class attributes
+        `ARGUMENTS: SectionType`
+            function arguments
+        `PARAMETERS: SectionType`
+            alternative name for arguments
+        `FUNCTIONS: SectionType`
+            module-level functions
+        `METHODS: SectionType`
+            class methods
+        `RETURNS: SectionType`
+            return type annotation
+        `RAISES: SectionType`
+            exception classes
+        `USAGE: SectionType`
+            usage examples
+        `UNKNOWN: SectionType`
+            unrecognised section
     """
 
     PREAMBLE = auto()
@@ -208,7 +222,7 @@ class ParsedDocstring:
     )
 
     def get_section(self, section_type: SectionType) -> Section | None:
-        """Get a section by type.
+        """get a section by type
 
         arguments:
             `section_type: SectionType`
@@ -223,14 +237,14 @@ class ParsedDocstring:
         return None
 
     def has_section(self, section_type: SectionType) -> bool:
-        """Check if docstring has a specific section.
+        """check if docstring has a specific section
 
         arguments:
             `section_type: SectionType`
                 the section type to check
 
         returns: `bool`
-            True if section exists
+            true if section exists
         """
         return any(s.section_type == section_type for s in self.sections)
 
@@ -240,6 +254,12 @@ class MDFParser:
 
     Parses docstrings into structured representations with diagnostic
     information about any formatting issues.
+
+    attributes:
+        `file_path: str | None`
+            path to source file for location tracking
+        `diagnostics: DiagnosticCollection`
+            collection of parsing diagnostics
 
     examples:
         ```python
@@ -257,7 +277,7 @@ class MDFParser:
     diagnostics: DiagnosticCollection
 
     def __init__(self, file_path: str | None = None) -> None:
-        """Initialise the parser.
+        """initialise the parser
 
         arguments:
             `file_path: str | None = None`
@@ -270,7 +290,7 @@ class MDFParser:
         self.diagnostics = DiagnosticCollection()
 
     def parse(self, docstring: str, line_offset: int = 1) -> ParsedDocstring:
-        """Parse a docstring into a structured representation.
+        """parse a docstring into a structured representation
 
         arguments:
             `docstring: str`
@@ -366,7 +386,7 @@ class MDFParser:
         return result
 
     def _detect_section_header(self, line: str) -> SectionType:
-        """Detect if a line is a section header.
+        """detect if a line is a section header
 
         arguments:
             `line: str`
@@ -393,14 +413,14 @@ class MDFParser:
         return SectionType.UNKNOWN
 
     def _looks_like_other_format(self, docstring: str) -> bool:
-        """Check if docstring looks like sphinx or google format.
+        """check if docstring looks like sphinx or google format
 
         arguments:
             `docstring: str`
                 docstring to check
 
         returns: `bool`
-            True if appears to be another format
+            true if appears to be another format
         """
         # sphinx patterns
         sphinx_patterns = [
@@ -431,7 +451,7 @@ class MDFParser:
         return False
 
     def _parse_section_content(self, section: Section) -> None:
-        """Parse the content of a section.
+        """parse the content of a section
 
         arguments:
             `section: Section`
@@ -467,7 +487,7 @@ class MDFParser:
     def _parse_parameters(
         self, content: list[str], base_location: Location | None
     ) -> list[ParameterDoc]:
-        """Parse parameter or attribute declarations.
+        """parse parameter or attribute declarations
 
         arguments:
             `content: list[str]`
@@ -524,7 +544,7 @@ class MDFParser:
     def _parse_functions(
         self, content: list[str], base_location: Location | None
     ) -> list[FunctionDoc]:
-        """Parse function or method declarations.
+        """parse function or method declarations
 
         arguments:
             `content: list[str]`
@@ -595,7 +615,7 @@ class MDFParser:
     def _parse_raises(
         self, content: list[str], base_location: Location | None
     ) -> list[ExceptionDoc]:
-        """Parse raises section content.
+        """parse raises section content
 
         arguments:
             `content: list[str]`
@@ -665,7 +685,7 @@ class MDFParser:
     def _parse_returns(
         self, content: list[str], base_location: Location | None
     ) -> list[ReturnDoc]:
-        """Parse returns section content.
+        """parse returns section content
 
         arguments:
             `content: list[str]`
@@ -736,7 +756,7 @@ class MDFParser:
     def _parse_declaration(
         self, declaration: str
     ) -> tuple[str, str, str | None]:
-        """Parse a variable declaration like 'name: str = "default"'.
+        """parse a variable declaration like 'name: str = "default"'
 
         arguments:
             `declaration: str`
@@ -768,7 +788,7 @@ class MDFParser:
     def _validate_section_order(
         self, parsed: ParsedDocstring, line_offset: int
     ) -> None:
-        """Validate that sections are in correct order.
+        """validate that sections are in correct order
 
         arguments:
             `parsed: ParsedDocstring`
@@ -797,7 +817,7 @@ class MDFParser:
 def parse_docstring(
     docstring: str, file_path: str | None = None, line_offset: int = 1
 ) -> ParsedDocstring:
-    """Convenience function to parse a docstring.
+    """convenience function to parse a docstring
 
     arguments:
         `docstring: str`

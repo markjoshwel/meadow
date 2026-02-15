@@ -64,30 +64,69 @@ class MeadowError(Exception):
 
 
 class ConfigError(MeadowError):
-    """error in configuration loading or validation."""
+    """exception raised for errors in configuration loading or validation.
+
+    examples:
+        ```python
+        raise ConfigError(
+            message="invalid configuration value",
+            location=Location(line=1, column=0, file="meadoc.toml")
+        )
+        ```
+    """
 
 
 class ParseError(MeadowError):
-    """error parsing a docstring."""
+    """exception raised for errors parsing a docstring.
+
+    examples:
+        ```python
+        raise ParseError(
+            message="malformed MDF docstring",
+            location=Location(line=10, column=4, file="example.py")
+        )
+        ```
+    """
 
 
 class ValidationError(MeadowError):
-    """error validating a docstring against code."""
+    """exception raised for errors validating a docstring against code.
+
+    examples:
+        ```python
+        raise ValidationError(
+            message="docstring does not match function signature",
+            location=Location(line=20, column=0, file="example.py")
+        )
+        ```
+    """
 
 
 class GenerationError(MeadowError):
-    """error generating or writing a docstring."""
+    """exception raised for errors generating or writing a docstring.
+
+    examples:
+        ```python
+        raise GenerationError(
+            message="failed to write docstring to file",
+            location=Location(line=1, column=0, file="example.py")
+        )
+        ```
+    """
 
 
 class ErrorSeverity(Enum):
     """severity levels for diagnostics.
 
-    members:
-        `ERROR`
+    this enum defines the severity levels for all meadow diagnostics.
+    each severity level indicates how critical an issue is.
+
+    attributes:
+        `ERROR: ErrorSeverity`
             critical issue that prevents processing
-        `WARNING`
+        `WARNING: ErrorSeverity`
             non-critical issue, processing can continue
-        `INFO`
+        `INFO: ErrorSeverity`
             informational message only
     """
 
@@ -293,7 +332,12 @@ class Location:
 
     @override
     def __str__(self) -> str:
-        """format location as "file:line:column" or "line X, column Y"."""
+        """format location as a human-readable string.
+
+        returns: `str`
+            formatted as "file:line:column" if file is set,
+            otherwise "line X, column Y"
+        """
         if self.file:
             return f"{self.file}:{self.line}:{self.column}"
         return f"line {self.line}, column {self.column}"
@@ -341,7 +385,11 @@ class Diagnostic:
 
     @override
     def __str__(self) -> str:
-        """format diagnostic as "CODE: message (location)"."""
+        """format diagnostic as a human-readable string.
+
+        returns: `str`
+            formatted as "CODE: message (line X, col Y)"
+        """
         return f"{self.code.value}: {self.message} (line {self.line}, col {self.column})"
 
 
@@ -367,7 +415,11 @@ class DiagnosticCollection:
     """
 
     def __init__(self) -> None:
-        """initialise an empty diagnostic collection."""
+        """initialise an empty diagnostic collection.
+
+        returns: `none`
+            no return value
+        """
         self.diagnostics: list[Diagnostic] = []
 
     def add(self, diagnostic: Diagnostic) -> None:
@@ -437,9 +489,20 @@ class DiagnosticCollection:
         return [d for d in self.diagnostics if d.severity == severity]
 
     def __len__(self) -> int:
-        """return the number of diagnostics in the collection."""
+        """return the number of diagnostics in the collection.
+
+        returns: `int`
+            count of diagnostics
+        """
         return len(self.diagnostics)
 
     def __iter__(self) -> Iterator[Diagnostic]:
-        """iterate over all diagnostics in the collection."""
+        """iterate over all diagnostics in the collection.
+
+        yields: `Diagnostic`
+            each diagnostic in the collection
+
+        returns: `none`
+            no return value
+        """
         return iter(self.diagnostics)

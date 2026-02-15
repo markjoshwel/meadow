@@ -11,8 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
-from meadow.config import Config, FormatConfig
-from meadow.validator import CodeElement, analyse_file
+from .config import Config, FormatConfig
+from .validator import CodeElement, analyse_file
 
 
 class UpdateResult(TypedDict):
@@ -41,6 +41,10 @@ class DocstringBuilder:
     Combines generation and updating logic into a single builder class
     with a clear lifecycle.
 
+    attributes:
+        `config: FormatConfig`
+            configuration for docstring formatting
+
     examples:
         ```python
         builder = DocstringBuilder(config)
@@ -56,7 +60,7 @@ class DocstringBuilder:
     config: FormatConfig
 
     def __init__(self, config: FormatConfig | None = None) -> None:
-        """Initialise the builder.
+        """initialise the builder
 
         arguments:
             `config: FormatConfig | None = None`
@@ -72,7 +76,7 @@ class DocstringBuilder:
         element: CodeElement,
         existing_docstring: str | None = None,
     ) -> str:
-        """Build an MDF docstring for a code element.
+        """build an mdf docstring for a code element
 
         arguments:
             `element: CodeElement`
@@ -81,7 +85,7 @@ class DocstringBuilder:
                 existing docstring to preserve preamble/body from
 
         returns: `str`
-            generated MDF docstring
+            generated mdf docstring
         """
         # extract existing content
         preamble = ""
@@ -115,7 +119,7 @@ class DocstringBuilder:
     def _extract_existing_content(
         self, docstring: str
     ) -> tuple[str, list[str]]:
-        """Extract preamble and body from existing docstring.
+        """extract preamble and body from existing docstring
 
         arguments:
             `docstring: str`
@@ -153,7 +157,7 @@ class DocstringBuilder:
         return preamble, body
 
     def _generate_preamble(self, element: CodeElement) -> str:
-        """Generate a preamble for an element.
+        """generate a preamble for an element
 
         arguments:
             `element: CodeElement`
@@ -175,14 +179,14 @@ class DocstringBuilder:
                 return f"documentation for {name}"
 
     def _is_section_header(self, line: str) -> bool:
-        """Check if a line is a section header.
+        """check if a line is a section header
 
         arguments:
             `line: str`
                 line to check
 
         returns: `bool`
-            True if line is a section header
+            true if line is a section header
         """
         headers = [
             "attributes:",
@@ -198,7 +202,7 @@ class DocstringBuilder:
         return line.lower().rstrip() in headers
 
     def _generate_arguments_section(self, element: CodeElement) -> list[str]:
-        """Generate arguments or parameters section.
+        """generate arguments or parameters section
 
         arguments:
             `element: CodeElement`
@@ -234,7 +238,7 @@ class DocstringBuilder:
         return arg_lines
 
     def _generate_returns_section(self, element: CodeElement) -> list[str]:
-        """Generate returns section.
+        """generate returns section
 
         arguments:
             `element: CodeElement`
@@ -256,7 +260,7 @@ class DocstringBuilder:
         return ret_lines
 
     def _format_docstring(self, lines: list[str]) -> str:
-        """Format docstring lines with proper indentation.
+        """format docstring lines with proper indentation
 
         arguments:
             `lines: list[str]`
@@ -280,6 +284,12 @@ class DocstringUpdater:
     Orchestrates the process of analysing files, generating docstrings,
     and tracking what changes would be made.
 
+    attributes:
+        `config: Config`
+            meadow configuration
+        `builder: DocstringBuilder`
+            builder for generating docstrings
+
     examples:
         ```python
         updater = DocstringUpdater(config)
@@ -294,7 +304,7 @@ class DocstringUpdater:
     builder: DocstringBuilder
 
     def __init__(self, config: Config) -> None:
-        """Initialise the updater.
+        """initialise the updater
 
         arguments:
             `config: Config`
@@ -309,11 +319,11 @@ class DocstringUpdater:
     def update_file(
         self, file_path: Path, fix_malformed: bool = False
     ) -> UpdateResult:
-        """Update docstrings in a file.
+        """update docstrings in a file
 
         arguments:
             `file_path: Path`
-                path to Python file
+                path to python file
             `fix_malformed: bool = False`
                 whether to fix malformed docstrings
 
@@ -349,14 +359,14 @@ class DocstringUpdater:
         return result
 
     def _should_document(self, element: CodeElement) -> bool:
-        """Check if an element should be documented.
+        """check if an element should be documented
 
         arguments:
             `element: CodeElement`
                 element to check
 
         returns: `bool`
-            True if element should be documented
+            true if element should be documented
         """
         name = element.name.split(".")[-1]
 

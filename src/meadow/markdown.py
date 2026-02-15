@@ -11,15 +11,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import NewType
 
-from meadow.config import GenerateConfig
-from meadow.parser import (
+from .config import GenerateConfig
+from .parser import (
     ExceptionDoc,
     FunctionDoc,
     ParameterDoc,
     ReturnDoc,
     SectionType,
 )
-from meadow.validator import CodeElement, analyse_file
+from .validator import CodeElement, analyse_file
 
 # type alias for markdown content
 Markdown = NewType("Markdown", str)
@@ -31,6 +31,10 @@ class MarkdownGenerator:
     Creates markdown-formatted API reference documentation from
     meadow-compliant docstrings.
 
+    attributes:
+        `config: GenerateConfig`
+            configuration for markdown generation
+
     examples:
         ```python
         generator = MarkdownGenerator(config)
@@ -41,7 +45,7 @@ class MarkdownGenerator:
     config: GenerateConfig
 
     def __init__(self, config: GenerateConfig | None = None) -> None:
-        """Initialise the generator.
+        """initialise the generator
 
         arguments:
             `config: GenerateConfig | None = None`
@@ -55,11 +59,11 @@ class MarkdownGenerator:
     def generate_for_file(
         self, file_path: Path, base_path: Path | None = None
     ) -> Markdown:
-        """Generate markdown documentation for a Python file.
+        """generate markdown documentation for a python file
 
         arguments:
             `file_path: Path`
-                path to Python file
+                path to python file
             `base_path: Path | None = None`
                 base path for relative links
 
@@ -100,11 +104,11 @@ class MarkdownGenerator:
         base_path: Path | None = None,
         title: str = "api reference",
     ) -> Markdown:
-        """Generate markdown documentation for multiple files.
+        """generate markdown documentation for multiple files
 
         arguments:
             `file_paths: list[Path]`
-                list of paths to Python files
+                list of paths to python files
             `base_path: Path | None = None`
                 base path for relative links
             `title: str = "api reference"`
@@ -144,18 +148,18 @@ class MarkdownGenerator:
             lines.extend(toc_entries)
 
         # add file contents
-        for _module_name, file_md in file_outputs:
+        for _module_name, content in file_outputs:
             lines.append("")
-            lines.append(file_md)
+            lines.append(content)
 
         return Markdown("\n".join(lines))
 
     def _get_module_name(self, file_path: Path) -> str:
-        """Get module name from file path.
+        """get module name from file path
 
         arguments:
             `file_path: Path`
-                path to Python file
+                path to python file
 
         returns: `str`
             module name (e.g., "package.module")
@@ -179,7 +183,7 @@ class MarkdownGenerator:
         return ".".join(parts) if parts else file_path.stem
 
     def _generate_for_element(self, element: CodeElement) -> str:
-        """Generate markdown for a single code element.
+        """generate markdown for a single code element
 
         arguments:
             `element: CodeElement`
@@ -299,7 +303,7 @@ class MarkdownGenerator:
         return "\n".join(lines)
 
     def _build_truncated_header(self, element: CodeElement) -> str:
-        """Build truncated header text for an element.
+        """build truncated header text for an element
 
         arguments:
             `element: CodeElement`
@@ -316,7 +320,7 @@ class MarkdownGenerator:
             return f"def {element.name}()"
 
     def _build_full_signature(self, element: CodeElement) -> str:
-        """Build full signature string for a function/method.
+        """build full signature string for a function/method
 
         arguments:
             `element: CodeElement`
@@ -346,7 +350,7 @@ class MarkdownGenerator:
         return f"def {element.name}({args_str}){return_annotation}:"
 
     def _get_header_level(self, element_type: str) -> int:
-        """Get markdown header level for element type.
+        """get markdown header level for element type
 
         arguments:
             `element_type: str`
@@ -365,7 +369,7 @@ class MarkdownGenerator:
         return base + offsets.get(element_type, 2)
 
     def _format_section_header(self, section_type: SectionType) -> str:
-        """Format a section header.
+        """format a section header
 
         arguments:
             `section_type: SectionType`
@@ -388,7 +392,7 @@ class MarkdownGenerator:
         return f"- {names.get(section_type, str(section_type))}:"
 
     def _format_parameter(self, param: ParameterDoc) -> list[str]:
-        """Format a parameter documentation.
+        """format a parameter documentation
 
         arguments:
             `param: ParameterDoc`
@@ -418,7 +422,7 @@ class MarkdownGenerator:
         return lines
 
     def _format_function(self, func: FunctionDoc) -> list[str]:
-        """Format a function documentation.
+        """format a function documentation
 
         arguments:
             `func: FunctionDoc`
@@ -441,7 +445,7 @@ class MarkdownGenerator:
         return lines
 
     def _format_return(self, ret: ReturnDoc) -> list[str]:
-        """Format a return documentation.
+        """format a return documentation
 
         arguments:
             `ret: ReturnDoc`
@@ -465,7 +469,7 @@ class MarkdownGenerator:
         return lines
 
     def _format_exception(self, exc: ExceptionDoc) -> list[str]:
-        """Format an exception documentation.
+        """format an exception documentation
 
         arguments:
             `exc: ExceptionDoc`

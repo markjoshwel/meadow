@@ -14,17 +14,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from meadow._version import __version__
-from meadow.config import Config, find_project_root
-from meadow.discovery import discover_python_files
-from meadow.errors import ErrorSeverity
-from meadow.generator import DocstringUpdater
-from meadow.markdown import MarkdownGenerator
-from meadow.validator import MDFValidator
+from ._version import __version__
+from .config import Config, find_project_root
+from .discovery import discover_python_files
+from .errors import ErrorSeverity
+from .generator import DocstringUpdater
+from .markdown import MarkdownGenerator
+from .validator import MDFValidator
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create the argument parser for meadoc."""
+    """create the argument parser for meadoc.
+
+    returns: `argparse.ArgumentParser`
+        configured argument parser with all subcommands
+    """
     parser = argparse.ArgumentParser(
         prog="meadoc",
         description="a docstring machine based on typing information for the meadow Docstring Format",
@@ -100,7 +104,7 @@ def create_parser() -> argparse.ArgumentParser:
     _ = config_parser.add_argument(
         "config_type",
         nargs="?",
-        choices=["pyproject.toml", "meadoc.toml"],
+        choices=["pyproject.toml", "meadoc.toml", ".meadoc.toml"],
         help="print example configuration for the specified file type",
     )
     _add_config_args(config_parser)
@@ -115,7 +119,15 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
-    """Add common arguments to a subparser."""
+    """add common arguments to format, check, and generate subparsers.
+
+    arguments:
+        `parser: argparse.ArgumentParser`
+            the argument parser to add arguments to
+
+    returns: `none`
+        no return value
+    """
     _ = parser.add_argument(
         "source",
         nargs="*",
@@ -167,7 +179,15 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_config_args(parser: argparse.ArgumentParser) -> None:
-    """Add config-specific arguments."""
+    """add config-specific arguments to the config subparser.
+
+    arguments:
+        `parser: argparse.ArgumentParser`
+            the argument parser to add arguments to
+
+    returns: `none`
+        no return value
+    """
     _ = parser.add_argument(
         "--include",
         type=str,
@@ -183,7 +203,15 @@ def _add_config_args(parser: argparse.ArgumentParser) -> None:
 
 
 def cmd_format(args: argparse.Namespace) -> int:
-    """Handle the format command."""
+    """handle the format command to generate or update docstrings.
+
+    arguments:
+        `args: argparse.Namespace`
+            parsed command-line arguments
+
+    returns: `int`
+        exit code (0 for success)
+    """
     config = Config.load()
 
     # update config from args
@@ -243,11 +271,40 @@ def cmd_format(args: argparse.Namespace) -> int:
             if parts:
                 print(f"{file_str}: {', '.join(parts)}")
 
+        # print summary
+        total_generated = sum(r["generated"] for r in results)
+        total_updated = sum(r["updated"] for r in results)
+        total_skipped = sum(r["skipped"] for r in results)
+        total_malformed = sum(r["malformed"] for r in results)
+
+        summary_parts: list[str] = []
+        if total_generated:
+            summary_parts.append(f"{total_generated} generated")
+        if total_updated:
+            summary_parts.append(f"{total_updated} updated")
+        if total_skipped:
+            summary_parts.append(f"{total_skipped} skipped")
+        if total_malformed:
+            summary_parts.append(f"{total_malformed} malformed")
+
+        if summary_parts:
+            print(f"\nmeadoc format: {', '.join(summary_parts)}")
+        else:
+            print("\nmeadoc format: no changes needed")
+
     return 0
 
 
 def cmd_check(args: argparse.Namespace) -> int:
-    """Handle the check command."""
+    """handle the check command to validate docstrings.
+
+    arguments:
+        `args: argparse.Namespace`
+            parsed command-line arguments
+
+    returns: `int`
+        exit code (0 if no errors, 1 if issues found)
+    """
     config = Config.load()
 
     # update config from args
@@ -312,11 +369,38 @@ def cmd_check(args: argparse.Namespace) -> int:
                 f"{issue['code']}: {issue['message']}"
             )
 
+        # print summary
+        error_count = sum(1 for i in all_issues if i["severity"] == "ERROR")
+        warning_count = sum(
+            1 for i in all_issues if i["severity"] == "WARNING"
+        )
+        info_count = sum(1 for i in all_issues if i["severity"] == "INFO")
+
+        if error_count or warning_count or info_count:
+            parts: list[str] = []
+            if error_count:
+                parts.append(f"{error_count} error(s)")
+            if warning_count:
+                parts.append(f"{warning_count} warning(s)")
+            if info_count:
+                parts.append(f"{info_count} info")
+            print(f"\nmeadoc check: {', '.join(parts)}")
+        else:
+            print("\nmeadoc check: success - no issues found")
+
     return 1 if has_errors else 0
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
-    """Handle the generate command."""
+    """handle the generate command to create markdown api documentation.
+
+    arguments:
+        `args: argparse.Namespace`
+            parsed command-line arguments
+
+    returns: `int`
+        exit code (0 for success)
+    """
     config = Config.load()
 
     # update config from args
@@ -366,14 +450,24 @@ def cmd_generate(args: argparse.Namespace) -> int:
         output_path = Path(args.output)
         output_path.write_text(markdown, encoding="utf-8")
         print(f"generated markdown written to {args.output}")
+        print(f"\nmeadoc generate: processed {len(files)} file(s)")
     else:
         print(markdown)
+        print(f"\nmeadoc generate: processed {len(files)} file(s)")
 
     return 0
 
 
 def cmd_config(args: argparse.Namespace) -> int:
-    """Handle the config command."""
+    """handle the config command to display configuration documentation.
+
+    arguments:
+        `args: argparse.Namespace`
+            parsed command-line arguments
+
+    returns: `int`
+        exit code (0 for success)
+    """
     config = Config.default()
 
     # update from args
@@ -384,7 +478,7 @@ def cmd_config(args: argparse.Namespace) -> int:
 
     if args.config_type == "pyproject.toml":
         print(config.to_example_toml("tool.meadoc"))
-    elif args.config_type == "meadoc.toml":
+    elif args.config_type in ("meadoc.toml", ".meadoc.toml"):
         print(config.to_example_toml("meadoc"))
     else:
         # print general config documentation
@@ -402,8 +496,16 @@ example configuration for each file type.
     return 0
 
 
-def cmd_about(args: argparse.Namespace) -> int:
-    """Handle the about command."""
+def cmd_about(_args: argparse.Namespace) -> int:  # pyright: ignore[reportUnusedParameter]
+    """handle the about command to display format documentation.
+
+    arguments:
+        `_args: argparse.Namespace`
+            parsed command-line arguments (unused)
+
+    returns: `int`
+        exit code (0 for success)
+    """
     print("""the meadow Docstring Format
 
 a plaintext-first alternative documentation string style for Python
@@ -443,7 +545,15 @@ see the full documentation at: https://github.com/markjoshwel/meadow
 
 
 def main(args: list[str] | None = None) -> int:
-    """Main entry point for meadoc."""
+    """main entry point for the meadoc cli.
+
+    arguments:
+        `args: list[str] | None = None`
+            command-line arguments (defaults to sys.argv if None)
+
+    returns: `int`
+        exit code (0 for success)
+    """
     parser = create_parser()
     parsed_args = parser.parse_args(args)
 

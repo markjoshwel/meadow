@@ -13,9 +13,9 @@ import ast
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from meadow.config import Config
-from meadow.errors import Diagnostic, DiagnosticCollection, ErrorCode
-from meadow.parser import MDFParser, ParameterDoc, ParsedDocstring, SectionType
+from .config import Config
+from .errors import Diagnostic, DiagnosticCollection, ErrorCode
+from .parser import MDFParser, ParameterDoc, ParsedDocstring, SectionType
 
 
 @dataclass
@@ -39,6 +39,8 @@ class CodeElement:
             attribute info: (name, type_annotation)
         `raises: list[str]`
             exception classes mentioned
+        `ignore: bool`
+            True if element has a # meadow: ignore comment
     """
 
     name: str
@@ -51,10 +53,49 @@ class CodeElement:
     return_annotation: str | None = None
     attributes: list[tuple[str, str | None]] = field(default_factory=list)
     raises: list[str] = field(default_factory=list)
+    ignore: bool = False
+
+
+def _has_ignore_comment(source_lines: list[str], end_lineno: int) -> bool:
+    """check if there's a # meadow: ignore comment after a docstring.
+
+    arguments:
+        `source_lines: list[str]`
+            source code split into lines (0-indexed)
+        `end_lineno: int`
+            line number where the docstring ends (1-indexed)
+
+    returns: `bool`
+        True if the line at end_lineno or the next non-empty line
+        contains # meadow: ignore
+    """
+    # end_lineno is 1-indexed, convert to 0-indexed
+    start_idx = end_lineno - 1
+
+    # check from the docstring end line onwards
+    for i in range(start_idx, len(source_lines)):
+        line = source_lines[i]
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # check for # meadow: ignore comment anywhere in the line
+        if "#" in line:
+            comment_start = line.find("#")
+            comment = line[comment_start:].lower()
+            if "meadow" in comment and "ignore" in comment:
+                return True
+
+        # if we hit a non-comment, non-empty line, stop searching
+        # (but only if we've moved past the docstring line)
+        if i > start_idx and stripped and not stripped.startswith("#"):
+            break
+
+    return False
 
 
 def analyse_file(file_path: Path) -> list[CodeElement] | None:
-    """Analyse a Python file and extract all code elements.
+    """analyse a python file and extract all code elements
 
     Pure function that reads and parses a file, returning structured
     information about all documented elements.
@@ -68,6 +109,7 @@ def analyse_file(file_path: Path) -> list[CodeElement] | None:
     """
     try:
         source = file_path.read_text(encoding="utf-8")
+        source_lines = source.splitlines()
         tree = ast.parse(source)
     except (OSError, SyntaxError):
         return None
@@ -87,25 +129,41 @@ def analyse_file(file_path: Path) -> list[CodeElement] | None:
 
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.ClassDef):
-            elements.extend(_analyse_class(node))
+            elements.extend(_analyse_class(node, source_lines))
         elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-            elements.append(_analyse_function(node))
+            elements.append(_analyse_function(node, source_lines=source_lines))
 
     return elements
 
 
-def _analyse_class(node: ast.ClassDef) -> list[CodeElement]:
-    """Analyse a class definition.
+def _analyse_class(
+    node: ast.ClassDef, source_lines: list[str]
+) -> list[CodeElement]:
+    """analyse a class definition and extract code elements.
 
     arguments:
         `node: ast.ClassDef`
-            AST class node
+            AST class node to analyse
+        `source_lines: list[str]`
+            source code split into lines
 
     returns: `list[CodeElement]`
-        class element and all its methods
+        list containing the class element and all its methods
     """
     elements: list[CodeElement] = []
     class_doc = ast.get_docstring(node)
+
+    # check for ignore comment on class
+    class_ignore = False
+    if class_doc and node.body:
+        # find end of docstring (docstring is first element in body)
+        first_item = node.body[0]
+        if isinstance(first_item, ast.Expr) and isinstance(
+            first_item.value, ast.Constant
+        ):
+            class_ignore = _has_ignore_comment(
+                source_lines, first_item.end_lineno or node.lineno
+            )
 
     # extract attributes from __init__ or class body
     attributes: list[tuple[str, str | None]] = []
@@ -115,7 +173,9 @@ def _analyse_class(node: ast.ClassDef) -> list[CodeElement]:
         if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
             if item.name == "__init__":
                 attributes.extend(_extract_init_attributes(item))
-            method = _analyse_function(item, class_name=node.name)
+            method = _analyse_function(
+                item, class_name=node.name, source_lines=source_lines
+            )
             methods.append(method)
         elif isinstance(item, ast.AnnAssign):
             attr_name = (
@@ -131,6 +191,7 @@ def _analyse_class(node: ast.ClassDef) -> list[CodeElement]:
         docstring=class_doc,
         line_number=node.lineno,
         attributes=attributes,
+        ignore=class_ignore,
     )
     elements.append(class_element)
     elements.extend(methods)
@@ -141,19 +202,34 @@ def _analyse_class(node: ast.ClassDef) -> list[CodeElement]:
 def _analyse_function(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
     class_name: str | None = None,
+    source_lines: list[str] | None = None,
 ) -> CodeElement:
-    """Analyse a function definition.
+    """analyse a function definition and extract code element information.
 
     arguments:
         `node: ast.FunctionDef | ast.AsyncFunctionDef`
-            AST function node
+            AST function node to analyse
         `class_name: str | None = None`
             containing class name if this is a method
+        `source_lines: list[str] | None = None`
+            source code split into lines
 
     returns: `CodeElement`
-        function or method element
+        function or method element with extracted information
     """
     func_doc = ast.get_docstring(node)
+
+    # check for ignore comment on function
+    func_ignore = False
+    if func_doc and source_lines and node.body:
+        # find end of docstring (docstring is first element in body)
+        first_item = node.body[0]
+        if isinstance(first_item, ast.Expr) and isinstance(
+            first_item.value, ast.Constant
+        ):
+            func_ignore = _has_ignore_comment(
+                source_lines, first_item.end_lineno or node.lineno
+            )
 
     # extract arguments
     arguments: list[tuple[str, str | None, str | None]] = []
@@ -208,20 +284,21 @@ def _analyse_function(
         line_number=node.lineno,
         arguments=arguments,
         return_annotation=return_ann,
+        ignore=func_ignore,
     )
 
 
 def _extract_init_attributes(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
 ) -> list[tuple[str, str | None]]:
-    """Extract instance attributes from __init__ method.
+    """extract instance attributes from __init__ method.
 
     arguments:
         `node: ast.FunctionDef | ast.AsyncFunctionDef`
-            __init__ method node
+            __init__ method node to extract attributes from
 
     returns: `list[tuple[str, str | None]]`
-            list of (attribute_name, type_annotation) tuples
+        list of (attribute_name, type_annotation) tuples
     """
     attributes: list[tuple[str, str | None]] = []
 
@@ -243,14 +320,14 @@ def _extract_init_attributes(
 
 
 def _annotation_to_str(annotation: ast.expr | None) -> str | None:
-    """Convert an AST annotation to a string.
+    """convert an AST annotation to a string representation.
 
     arguments:
         `annotation: ast.expr | None`
-            AST annotation node
+            AST annotation node to convert
 
     returns: `str | None`
-            string representation or None
+        string representation of the annotation, or None if not possible
     """
     if annotation is None:
         return None
@@ -276,14 +353,14 @@ def _annotation_to_str(annotation: ast.expr | None) -> str | None:
 
 
 def _value_to_str(value: ast.expr) -> str | None:
-    """Convert a value AST node to a string.
+    """convert a value AST node to a string representation.
 
     arguments:
         `value: ast.expr`
-            AST value node
+            AST value node to convert
 
     returns: `str | None`
-            string representation or None
+        string representation of the value, or None if not possible
     """
     if isinstance(value, ast.Constant):
         return repr(value.value)
@@ -307,6 +384,12 @@ class MDFValidator:
 
     Compares parsed docstrings with actual code to detect mismatches.
 
+    attributes:
+        `config: Config | None`
+            configuration for validation rules
+        `diagnostics: DiagnosticCollection`
+            collection of validation diagnostics
+
     examples:
         ```python
         validator = MDFValidator(config)
@@ -322,7 +405,7 @@ class MDFValidator:
     diagnostics: DiagnosticCollection
 
     def __init__(self, config: Config | None = None) -> None:
-        """Initialise the validator.
+        """initialise the validator
 
         arguments:
             `config: Config | None = None`
@@ -335,7 +418,7 @@ class MDFValidator:
         self.diagnostics = DiagnosticCollection()
 
     def validate_file(self, file_path: Path) -> DiagnosticCollection:
-        """Validate all docstrings in a file.
+        """validate all docstrings in a file
 
         arguments:
             `file_path: Path`
@@ -364,7 +447,7 @@ class MDFValidator:
         return self.diagnostics
 
     def _validate_element(self, element: CodeElement) -> None:
-        """Validate a single code element's docstring.
+        """validate a single code element's docstring
 
         arguments:
             `element: CodeElement`
@@ -373,6 +456,15 @@ class MDFValidator:
         returns: `none`
             no return value
         """
+        # skip if element has # meadow: ignore comment
+        if element.ignore:
+            return
+
+        # skip module validation if module_docstrings is disabled
+        if element.element_type == "module":
+            if self.config is not None and not self.config.module_docstrings:
+                return
+
         if element.docstring is None:
             if self._should_have_docstring(element):
                 self.diagnostics.add(
@@ -405,7 +497,7 @@ class MDFValidator:
         self._validate_against_code(parsed, element)
 
     def _should_have_docstring(self, element: CodeElement) -> bool:
-        """Check if an element should have a docstring.
+        """check if an element should have a docstring
 
         arguments:
             `element: CodeElement`
@@ -414,6 +506,12 @@ class MDFValidator:
         returns: `bool`
             True if element should be documented
         """
+        # skip modules if module_docstrings is disabled
+        if element.element_type == "module":
+            return not (
+                self.config is not None and not self.config.module_docstrings
+            )
+
         # skip private elements
         if element.name.startswith("_") and not element.name.startswith("__"):
             return False
@@ -427,7 +525,7 @@ class MDFValidator:
     def _validate_against_code(
         self, parsed: ParsedDocstring, element: CodeElement
     ) -> None:
-        """Validate parsed docstring against actual code.
+        """validate parsed docstring against actual code
 
         arguments:
             `parsed: ParsedDocstring`
@@ -450,7 +548,7 @@ class MDFValidator:
     def _validate_arguments(
         self, parsed: ParsedDocstring, element: CodeElement
     ) -> None:
-        """Validate that arguments match between docstring and code.
+        """validate that arguments match between docstring and code
 
         arguments:
             `parsed: ParsedDocstring`
@@ -521,7 +619,7 @@ class MDFValidator:
     def _validate_return_type(
         self, parsed: ParsedDocstring, element: CodeElement
     ) -> None:
-        """Validate return type annotation.
+        """validate return type annotation
 
         arguments:
             `parsed: ParsedDocstring`
@@ -547,7 +645,7 @@ class MDFValidator:
     def _validate_attributes(
         self, parsed: ParsedDocstring, element: CodeElement
     ) -> None:
-        """Validate class attributes.
+        """validate class attributes.
 
         arguments:
             `parsed: ParsedDocstring`

@@ -14,7 +14,7 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 
-from meadow.config import Config
+from .config import Config
 
 
 def discover_python_files(
@@ -22,9 +22,9 @@ def discover_python_files(
     config: Config,
     respect_gitignore: bool = True,
 ) -> Iterator[Path]:
-    """Discover python files based on sources and configuration.
+    """discover python files based on sources and configuration
 
-    Arguments:
+    arguments:
         `sources: list[Path]`
             list of source files or directories to search
         `config: Config`
@@ -100,7 +100,17 @@ def discover_python_files(
 
 
 def _matches_exclude(file_path: Path, exclude_patterns: list[str]) -> bool:
-    """Check if a file matches any exclude pattern."""
+    """check if a file matches any exclude pattern.
+
+    arguments:
+        `file_path: Path`
+            the file path to check
+        `exclude_patterns: list[str]`
+            list of glob patterns to match against
+
+    returns: `bool`
+        True if the file matches any exclude pattern
+    """
     path_str = str(file_path)
     name = file_path.name
 
@@ -126,7 +136,15 @@ def _matches_exclude(file_path: Path, exclude_patterns: list[str]) -> bool:
 
 
 def _parse_gitignore(gitignore_path: Path) -> list[str]:
-    """Parse a .gitignore file and return patterns."""
+    """parse a .gitignore file and return patterns.
+
+    arguments:
+        `gitignore_path: Path`
+            path to the .gitignore file
+
+    returns: `list[str]`
+        list of gitignore patterns (excluding comments and negations)
+    """
     patterns: list[str] = []
 
     try:
@@ -147,7 +165,17 @@ def _parse_gitignore(gitignore_path: Path) -> list[str]:
 
 
 def _matches_gitignore(name: str, patterns: list[str]) -> bool:
-    """Check if a name matches any gitignore pattern."""
+    """check if a name matches any gitignore pattern.
+
+    arguments:
+        `name: str`
+            the name to check (file or directory name)
+        `patterns: list[str]`
+            list of gitignore patterns
+
+    returns: `bool`
+        True if the name matches any pattern
+    """
     for pattern in patterns:
         # handle directory patterns
         if pattern.endswith("/"):
@@ -169,9 +197,9 @@ def should_process_file(
     config: Config,
     respect_gitignore: bool = True,
 ) -> bool:
-    """Check if a file should be processed based on configuration.
+    """check if a file should be processed based on configuration
 
-    Arguments:
+    arguments:
         `file_path: Path`
             the file to check
         `config: Config`
@@ -202,9 +230,9 @@ def should_process_file(
 
 
 def get_relative_path(file_path: Path, base_path: Path) -> str:
-    """Get a relative path from base_path to file_path.
+    """get a relative path from base_path to file_path
 
-    Arguments:
+    arguments:
         `file_path: Path`
             the target file path
         `base_path: Path`

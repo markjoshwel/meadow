@@ -66,7 +66,17 @@ INDENT_STYLE_OPTIONS: tuple[str, ...] = ("space", "tab")
 
 
 def _get_bool(table: Table, key: str) -> bool | None:
-    """Safely get a boolean value from a TOML table."""
+    """safely get a boolean value from a TOML table.
+
+    arguments:
+        `table: Table`
+            the TOML table to read from
+        `key: str`
+            the key to look up
+
+    returns: `bool | None`
+        the boolean value if present and valid, None otherwise
+    """
     value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, bool):
         return value
@@ -74,7 +84,17 @@ def _get_bool(table: Table, key: str) -> bool | None:
 
 
 def _get_int(table: Table, key: str) -> int | None:
-    """Safely get an integer value from a TOML table."""
+    """safely get an integer value from a TOML table.
+
+    arguments:
+        `table: Table`
+            the TOML table to read from
+        `key: str`
+            the key to look up
+
+    returns: `int | None`
+        the integer value if present and valid, None otherwise
+    """
     value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, int):
         return value
@@ -82,7 +102,17 @@ def _get_int(table: Table, key: str) -> int | None:
 
 
 def _get_str(table: Table, key: str) -> str | None:
-    """Safely get a string value from a TOML table."""
+    """safely get a string value from a TOML table.
+
+    arguments:
+        `table: Table`
+            the TOML table to read from
+        `key: str`
+            the key to look up
+
+    returns: `str | None`
+        the string value if present and valid, None otherwise
+    """
     value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, str):
         return value
@@ -90,7 +120,17 @@ def _get_str(table: Table, key: str) -> str | None:
 
 
 def _get_list(table: Table, key: str) -> list[object] | None:
-    """Safely get a list value from a TOML table."""
+    """safely get a list value from a TOML table.
+
+    arguments:
+        `table: Table`
+            the TOML table to read from
+        `key: str`
+            the key to look up
+
+    returns: `list[object] | None`
+        the list value if present and valid, None otherwise
+    """
     value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, list):
         return cast(list[object], value)
@@ -98,7 +138,17 @@ def _get_list(table: Table, key: str) -> list[object] | None:
 
 
 def _get_table(table: Table | TOMLDocument, key: str) -> Table | None:
-    """Safely get a table value from a TOML table or document."""
+    """safely get a table value from a TOML table or document.
+
+    arguments:
+        `table: Table | TOMLDocument`
+            the TOML table or document to read from
+        `key: str`
+            the key to look up
+
+    returns: `Table | None`
+        the table value if present and valid, None otherwise
+    """
     value: object = table.get(key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if isinstance(value, Table):
         return value
@@ -219,7 +269,7 @@ class Config:
 
     @classmethod
     def default(cls) -> Config:
-        """Create a configuration with default values.
+        """create a configuration with default values
 
         returns: `Config`
             configuration populated with default values
@@ -235,9 +285,9 @@ class Config:
 
     @classmethod
     def load(cls, start_path: Path | None = None) -> Config:
-        """Load configuration from available config files.
+        """load configuration from available config files
 
-        Searches for configuration files in order of precedence:
+        searches for configuration files in order of precedence:
         1. .meadoc.toml
         2. meadoc.toml
         3. pyproject.toml
@@ -278,7 +328,7 @@ class Config:
         return config
 
     def _load_from_file(self, path: Path) -> None:
-        """Load configuration from a TOML file.
+        """load configuration from a toml file
 
         arguments:
             `path: Path`
@@ -346,7 +396,7 @@ class Config:
             self._load_generate_config(generate_table)
 
     def _load_format_config(self, table: Table) -> None:
-        """Load format configuration from a TOML table.
+        """load format configuration from a toml table
 
         arguments:
             `table: Table`
@@ -390,7 +440,7 @@ class Config:
             )
 
     def _load_generate_config(self, table: Table) -> None:
-        """Load generate configuration from a TOML table.
+        """load generate configuration from a toml table
 
         arguments:
             `table: Table`
@@ -431,14 +481,14 @@ class Config:
             self.generate.external_links = links_dict
 
     def to_example_toml(self, table_name: str = "meadoc") -> str:
-        """Generate example TOML configuration as a string.
+        """generate example toml configuration as a string
 
         arguments:
             `table_name: str = "meadoc"`
                 the table name to use ("meadoc" or "tool.meadoc")
 
         returns: `str`
-            formatted TOML configuration
+            formatted toml configuration
         """
         lines: list[str] = [
             f"# example {table_name}.toml configuration",
@@ -512,10 +562,10 @@ class Config:
 
 
 def find_project_root(start_path: Path | None = None) -> Path:
-    """Find the project root directory.
+    """find the project root directory
 
-    Searches for common project indicators like .git, pyproject.toml,
-    and meadoc.toml files.
+    searches for common project indicators like .git, pyproject.toml,
+    and meadoc.toml files
 
     arguments:
         `start_path: Path | None = None`

@@ -21,6 +21,8 @@ dev = [
     "pytest>=8.0.0",
     "basedpyright>=1.0.0",
     "ruff>=0.6.0",
+    "mypy>=1.0.0",
+    "raiseattention>=2026.2.141",
 ]
 
 [tool.pytest.ini_options]

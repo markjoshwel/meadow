@@ -14,16 +14,16 @@ This is meadow: a docstring machine based on typing information for the meadow D
 
 ```bash
 # strict static analysis + type check
-uv run basedpyright .
+uv run basedpyright src
 
 # type safety
 uv run mypy .
 
 # exception safety
-uvx --refresh --from B:\RaiseAttention raiseattention check .
+uv run raiseattention check src
 
 # MDF compliance (self-check)
-uvx --refresh --from B:\meadow meadoc check .
+uv run meadoc check src
 ```
 
 ## Code Standards
