@@ -579,6 +579,8 @@ example configuration for each file type.
 def cmd_about(_args: argparse.Namespace) -> int:
     """handle the about command to display format documentation.
 
+    reads and displays the README.md from the bundled package or repository.
+
     arguments:
         `_args: argparse.Namespace`
             parsed command-line arguments (unused)
@@ -586,37 +588,32 @@ def cmd_about(_args: argparse.Namespace) -> int:
     returns: `int`
         exit code (0 for success)
     """
-    print("""the meadow Docstring Format
+    # try to find README.md in various locations
+    readme_paths = [
+        # bundled with package (wheel)
+        Path(__file__).parent / "README.md",
+        # development mode (repo root)
+        Path(__file__).parent.parent.parent / "README.md",
+        # current working directory
+        Path.cwd() / "README.md",
+    ]
+
+    readme_content: str | None = None
+    for readme_path in readme_paths:
+        if readme_path.exists():
+            try:
+                readme_content = readme_path.read_text(encoding="utf-8")
+                break
+            except (OSError, UnicodeDecodeError):
+                continue
+
+    if readme_content:
+        print(readme_content)
+    else:
+        # fallback: print basic info
+        print("""the meadow Docstring Format
 
 a plaintext-first alternative documentation string style for Python
-
-key features:
-  - easy and intuitive to read and write
-  - closely follows Python syntax, including type annotations
-  - works best on Zed, okay on Visual Studio Code, eh on PyCharm
-
-section types (in order):
-  1. preamble (required) - one-line description
-  2. body (optional) - longer explanation
-  3. attributes/arguments/parameters - incoming signatures
-  4. functions/methods - outgoing signatures
-  5. returns - return type annotation
-  6. raises - exception classes
-  7. usage (optional) - code examples
-
-example:
-    \"\"\"a baker's confectionery, usually baked, a lie
-
-    attributes:
-        `name: str`
-            name of the cake
-        `ingredients: list[Ingredient]`
-            ingredients of the cake
-
-    methods:
-        `def bake(self, override: BakingOverride | None = None) -> bool`
-            bakes the cake and returns True if successful
-    \"\"\"
 
 see the full documentation at: https://github.com/markjoshwel/meadow
 """)
