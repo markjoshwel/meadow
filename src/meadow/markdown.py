@@ -6,7 +6,6 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 this module generates markdown API reference documentation from MDF docstrings.
 """
 
-
 import ast
 import sys
 from pathlib import Path
@@ -22,6 +21,7 @@ from .parser import (
     ReturnDoc,
     SectionType,
 )
+from .stdlib_links import STDLIB_LINKS
 from .validator import CodeElement, analyse_file
 
 # type alias for markdown content
@@ -539,12 +539,40 @@ class MarkdownGenerator:
         lines: list[str] = []
         type_str = param.type_annotation or "Any"
 
-        if param.default_value:
-            first_line = (
-                f"  - `{param.name}: {type_str} = {param.default_value}`"
-            )
+        # check if we have a link for this type
+        base_type = type_str.split("[")[0].strip()
+        link_url: str | None = None
+
+        # check user config first (if user provides a URL, use it)
+        if base_type in self.config.external_links:
+            user_url = self.config.external_links[base_type]
+            if user_url:  # only use if not empty
+                link_url = user_url
+
+        # fall back to baked-in stdlib links
+        if link_url is None:
+            if base_type in STDLIB_LINKS:
+                link_url = STDLIB_LINKS[base_type]
+            # fallback to module prefix
+            elif "." in base_type:
+                module_prefix = base_type.split(".")[0]
+                if module_prefix in STDLIB_LINKS:
+                    link_url = STDLIB_LINKS[module_prefix]
+
+        if link_url:
+            # has link: [`name: type`](url)
+            if param.default_value:
+                first_line = f"  - [`{param.name}: {type_str} = {param.default_value}`]({link_url})"
+            else:
+                first_line = f"  - [`{param.name}: {type_str}`]({link_url})"
         else:
-            first_line = f"  - `{param.name}: {type_str}`"
+            # no link: `name: type`
+            if param.default_value:
+                first_line = (
+                    f"  - `{param.name}: {type_str} = {param.default_value}`"
+                )
+            else:
+                first_line = f"  - `{param.name}: {type_str}`"
 
         if param.description:
             first_line += "  "  # two spaces for markdown line break
@@ -622,10 +650,33 @@ class MarkdownGenerator:
         """
         lines: list[str] = []
         type_str = ret.type_annotation or "Any"
-        first_line = f"  - `{type_str}`"
+
+        # check if we have a link for this type
+        base_type = type_str.split("[")[0].strip()
+        link_url: str | None = None
+
+        # check user config first (if user provides a URL, use it)
+        if base_type in self.config.external_links:
+            user_url = self.config.external_links[base_type]
+            if user_url:  # only use if not empty
+                link_url = user_url
+
+        # fall back to baked-in stdlib links
+        if link_url is None:
+            if base_type in STDLIB_LINKS:
+                link_url = STDLIB_LINKS[base_type]
+            elif "." in base_type:
+                module_prefix = base_type.split(".")[0]
+                if module_prefix in STDLIB_LINKS:
+                    link_url = STDLIB_LINKS[module_prefix]
+
+        if link_url:
+            first_line = f"  - [`{type_str}`]({link_url})"
+        else:
+            first_line = f"  - `{type_str}`"
 
         if ret.description:
-            first_line += "  "  # two spaces for markdown line break
+            first_line += "  "
             lines.append(first_line)
             desc = " ".join(ret.description)
             lines.append(f"    {desc}")
@@ -656,6 +707,44 @@ class MarkdownGenerator:
             lines.append(first_line)
 
         return lines
+
+    def _format_type_with_link(self, type_str: str) -> str:
+        """format a type string with link if available.
+
+        checks baked-in stdlib links first, then user config external links.
+        user config takes precedence over baked-in links.
+
+        arguments:
+            `type_str: str`
+                type annotation string (e.g., "pathlib.Path")
+
+        returns: `str`
+            markdown link or plain text
+        """
+        # clean up the type string - remove generic parameters
+        base_type = type_str.split("[")[0].strip()
+
+        # check user config first (user overrides baked-in)
+        if base_type in self.config.external_links:
+            url = self.config.external_links[base_type]
+            if url:
+                return f"[{type_str}]({url})"
+            return type_str
+
+        # check baked-in stdlib links
+        if base_type in STDLIB_LINKS:
+            url = STDLIB_LINKS[base_type]
+            return f"[{type_str}]({url})"
+
+        # fallback: check if module prefix is in stdlib links
+        # e.g., "pathlib.Path" -> try "pathlib"
+        if "." in base_type:
+            module_prefix = base_type.split(".")[0]
+            if module_prefix in STDLIB_LINKS:
+                url = STDLIB_LINKS[module_prefix]
+                return f"[{type_str}]({url})"
+
+        return type_str
 
     def collect_external_types(self, file_paths: list[Path]) -> set[str]:
         """collect all external type references from docstrings
