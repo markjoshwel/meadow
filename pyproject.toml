@@ -5,8 +5,8 @@ description = "a docstring machine based on typing information for the meadow Do
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "tomlkit>=0.13.0,<0.14.0",
     "libsightseeing>=0.2.0",
+    "tomlkit>=0.14.0",
 ]
 
 [project.scripts]
@@ -22,13 +22,13 @@ force-include = { "README.md" = "meadow/README.md" }
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
-    "basedpyright>=1.0.0",
-    "ruff>=0.6.0",
-    "mypy>=1.0.0",
+    "basedpyright>=1.38.0",
+    "beautifulsoup4>=4.14.3",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
     "raiseattention>=2026.2.141",
     "requests>=2.32.5",
-    "beautifulsoup4>=4.14.3",
+    "ruff>=0.15.1",
 ]
 
 [tool.pytest.ini_options]
