@@ -1,6 +1,6 @@
 [project]
 name = "meadow"
-version = "2026.2.15"
+version = "2026.2.16"
 description = "a docstring machine based on typing information for the meadow Docstring Format"
 readme = "README.md"
 requires-python = ">=3.13"

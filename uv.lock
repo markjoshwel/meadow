@@ -229,7 +229,7 @@ wheels = [
 
 [[package]]
 name = "meadow"
-version = "2026.2.15"
+version = "2026.2.16"
 source = { editable = "." }
 dependencies = [
     { name = "libsightseeing" },
