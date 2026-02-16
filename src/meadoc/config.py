@@ -18,7 +18,7 @@ from libsightseeing import find_project_root as _find_project_root
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
-from meadow.errors import ConfigError, Location
+from meadoc.errors import ConfigError, Location
 
 # constants
 DEFAULT_INCLUDE_PATTERNS: list[str] = [

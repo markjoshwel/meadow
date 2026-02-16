@@ -5,8 +5,8 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 
 from pathlib import Path
 
-from meadow.config import Config
-from meadow.discovery import discover_python_files
+from meadoc.config import Config
+from meadoc.discovery import discover_python_files
 
 
 class TestDiscoverPythonFiles:

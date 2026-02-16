@@ -7,7 +7,7 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from meadow.validator import MDFValidator, analyse_file
+from meadoc.validator import MDFValidator, analyse_file
 
 
 class TestMeadowIgnore:

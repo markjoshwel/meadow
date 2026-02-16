@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TypeVar
 
-from meadow.errors import DiagnosticCollection, ErrorCode, Location
+from meadoc.errors import DiagnosticCollection, ErrorCode, Location
 
 T = TypeVar("T", "ParameterDoc", "FunctionDoc", "ExceptionDoc", "ReturnDoc")
 

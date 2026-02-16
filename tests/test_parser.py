@@ -4,8 +4,8 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 """
 
 
-from meadow.errors import ErrorCode
-from meadow.parser import (
+from meadoc.errors import ErrorCode
+from meadoc.parser import (
     ParameterDoc,
     SectionType,
     parse_docstring,

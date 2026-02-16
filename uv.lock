@@ -228,7 +228,7 @@ wheels = [
 ]
 
 [[package]]
-name = "meadow"
+name = "meadoc"
 version = "2026.2.16"
 source = { editable = "." }
 dependencies = [

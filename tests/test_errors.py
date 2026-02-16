@@ -4,7 +4,7 @@ with all my heart, 2024-2025, mark joshwel <mark@joshwel.co>
 SPDX-License-Identifier: Unlicense OR 0BSD
 """
 
-from meadow.errors import (
+from meadoc.errors import (
     Diagnostic,
     DiagnosticCollection,
     ErrorCode,

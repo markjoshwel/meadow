@@ -327,7 +327,7 @@ class MarkdownGenerator:
         if not element.docstring:
             return ""
 
-        from meadow.parser import MDFParser
+        from meadoc.parser import MDFParser
 
         parser = MDFParser()
         parsed = parser.parse(element.docstring, element.line_number)
@@ -762,7 +762,7 @@ class MarkdownGenerator:
                 if not element.docstring:
                     continue
 
-                from meadow.parser import MDFParser
+                from meadoc.parser import MDFParser
 
                 parser = MDFParser()
                 parsed = parser.parse(element.docstring, element.line_number)

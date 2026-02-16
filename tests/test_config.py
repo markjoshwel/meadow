@@ -5,7 +5,7 @@ SPDX-License-Identifier: Unlicense OR 0BSD
 
 from pathlib import Path
 
-from meadow.config import Config, FormatConfig, GenerateConfig
+from meadoc.config import Config, FormatConfig, GenerateConfig
 
 
 class TestConfig:
