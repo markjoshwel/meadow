@@ -1,6 +1,6 @@
 """configuration loading and management for meadow.
 
-with all my heart, 2026, mark joshwel <mark@joshwel.co>
+with all my heart, 2025-2026, mark joshwel <mark@joshwel.co>
 SPDX-License-Identifier: Unlicense OR 0BSD
 
 this module handles loading configuration from pyproject.toml, meadoc.toml,
